@@ -30,7 +30,7 @@ hardware:
     poll_interval: 2  # seconds
 
   gps:
-    enabled: false
+    enabled: true
     device: "/dev/ttyS1"
     baudrate: 9600
     protocol: "nmea"  # nmea, ublox
@@ -50,7 +50,7 @@ hardware:
     enabled: true
     spi_bus: 1
     spi_device: 1
-    cs_pin: 24
+    cs_pin: 20  # GPIO chip select pin (CE для CC1101)
     gdo0_pin: 25
     gdo2_pin: null
     default_freq: 433.92  # MHz
@@ -60,9 +60,9 @@ hardware:
 
   nrf24:
     enabled: true
-    spi_bus: 0
-    spi_device: 0
-    ce_pin: 7  # PA7 on Orange Pi (BOARD numbering)
+    spi_bus: 1
+    spi_device: 1
+    ce_pin: 18  # GPIO chip enable pin
     lna_enable: true  # Enable LNA for better sensitivity
     pa_level: 3  # 0: -18dBm, 1: -12dBm, 2: -6dBm, 3: 0dBm (or +20dBm for PA module)
 
@@ -223,7 +223,7 @@ meshtastic:
 
 # SDR configuration
 sdr:
-  enabled: false
+  enabled: true
   device_priority: ["hackrf", "rtlsdr"]
 
   hackrf:
@@ -244,7 +244,7 @@ sdr:
 
 # BadUSB configuration
 badusb:
-  enabled: false
+  enabled: true
   usb_gadget_setup: true
   keyboard_layout: "us"  # us, uk, de, ru, etc.
   payload_directory: "badusb_payloads/"
@@ -260,7 +260,7 @@ badusb:
 
 # Bluetooth configuration
 bluetooth:
-  enabled: false
+  enabled: true
   adapter: "hci0"
   scan_timeout: 10  # seconds
   ble_enabled: true
