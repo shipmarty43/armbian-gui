@@ -1,0 +1,29 @@
+# CyberDeck Interface Python Dependencies
+
+# Core
+pyyaml>=6.0
+urwid>=2.1.2
+psutil>=5.9.0
+
+# Hardware control
+# OPi.GPIO>=0.5.0  # Install separately on Orange Pi
+spidev>=3.5
+smbus2>=0.4.0
+
+# NFC (optional)
+# nfcpy>=1.0.4  # Uncomment if using NFC
+
+# GPS (optional)
+# gps3>=0.33.3  # Uncomment if using GPS
+
+# LoRa & Mesh (optional)
+# meshtastic>=2.2.0  # Uncomment if using LoRa
+# rns>=0.5.0  # Reticulum network stack
+# adafruit-circuitpython-rfm9x>=2.2.0
+# adafruit-blinka>=8.0.0
+
+# Bluetooth (optional)
+# pybluez>=0.23  # Uncomment if using Bluetooth
+
+# Additional utilities
+python-dateutil>=2.8.0
