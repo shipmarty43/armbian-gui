@@ -102,7 +102,7 @@ class CC1101:
     - RX/TX with FIFO
     """
 
-    def __init__(self, spi_bus: int = 0, spi_device: int = 1, cs_pin: int = 24, gdo0_pin: int = 25):
+    def __init__(self, spi_bus: int = 1, spi_device: int = 1, cs_pin: int = 24, gdo0_pin: int = 25):
         """
         Initialize CC1101 driver.
 
