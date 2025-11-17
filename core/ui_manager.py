@@ -406,47 +406,61 @@ class UIManager:
 
         box = urwid.LineBox(pile, title=title)
 
-        # Показываем как overlay
+        # Показываем как overlay поверх текущего body
         overlay = urwid.Overlay(
             box,
-            self.frame,
+            self.frame.body,
             align='center',
-            width=('relative', 60),
+            width=('relative', 80),
             valign='middle',
-            height=('relative', 40)
+            height=('relative', 60)
         )
 
-        self.view_stack.append(self.frame)
-        self.overlay = overlay
+        # Сохраняем текущий body и заменяем на overlay
+        self.view_stack.append(self.frame.body)
+        self.frame.body = overlay
 
     def close_overlay(self):
         """Закрыть overlay"""
         if self.view_stack:
-            self.view_stack.pop()
+            previous_body = self.view_stack.pop()
+            self.frame.body = previous_body
 
     def update_status_bar(self):
         """Обновить статус-панель с данными мониторов"""
         status_parts = []
 
         # Батарея
-        if self.battery_monitor and self.battery_monitor.enabled:
-            self.battery_monitor.update()
-            battery = self.battery_monitor.get_status()
-            status_parts.append(f"🔋{battery['soc']}%")
+        if self.battery_monitor and hasattr(self.battery_monitor, 'enabled') and self.battery_monitor.enabled:
+            try:
+                self.battery_monitor.update()
+                battery = self.battery_monitor.get_status()
+                if battery and 'soc' in battery:
+                    status_parts.append(f"🔋{battery['soc']}%")
+            except Exception as e:
+                self.logger.debug(f"Battery monitor error: {e}")
 
         # WiFi
         if self.network_monitor:
-            self.network_monitor.update()
-            network = self.network_monitor.get_status()
-            status_parts.append(f"📶{network['wifi']['signal']}/4")
-            status_parts.append(f"📡{network['lte']['signal']}/5")
+            try:
+                self.network_monitor.update()
+                network = self.network_monitor.get_status()
+                if network and 'wifi' in network:
+                    status_parts.append(f"📶{network['wifi']['signal']}/4")
+                if network and 'lte' in network:
+                    status_parts.append(f"📡{network['lte']['signal']}/5")
+            except Exception as e:
+                self.logger.debug(f"Network monitor error: {e}")
 
         # Температура
         if self.thermal_monitor:
-            self.thermal_monitor.update()
-            thermal = self.thermal_monitor.get_status()
-            if thermal['max_temp']:
-                status_parts.append(f"🌡️{thermal['max_temp']}°C")
+            try:
+                self.thermal_monitor.update()
+                thermal = self.thermal_monitor.get_status()
+                if thermal and thermal.get('max_temp'):
+                    status_parts.append(f"🌡️{thermal['max_temp']}°C")
+            except Exception as e:
+                self.logger.debug(f"Thermal monitor error: {e}")
 
         # Время
         current_time = datetime.now().strftime("%H:%M")
@@ -454,11 +468,15 @@ class UIManager:
 
         # IP
         if self.network_monitor:
-            ip = self.network_monitor.get_primary_ip()
-            status_parts.append(f"📍{ip}")
+            try:
+                ip = self.network_monitor.get_primary_ip()
+                if ip and ip != "N/A":
+                    status_parts.append(f"📍{ip}")
+            except Exception as e:
+                self.logger.debug(f"IP retrieval error: {e}")
 
         # Объединяем
-        status_text = " | ".join(status_parts)
+        status_text = " | ".join(status_parts) if status_parts else "CyberDeck v3.0"
         self.status_bar.original_widget.set_text(status_text)
 
     def run(self):
