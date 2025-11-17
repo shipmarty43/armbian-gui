@@ -24,7 +24,7 @@ class SubGHzModule(BaseModule):
             priority=1  # Highest priority
         )
 
-        self.spi_bus = 0
+        self.spi_bus = 1
         self.spi_device = 1
         self.current_frequency = 433.92  # MHz
         self.is_recording = False

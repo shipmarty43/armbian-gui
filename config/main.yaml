@@ -38,14 +38,17 @@ hardware:
 
   nfc:
     enabled: true
-    interface: "pn532_i2c"  # or "pn532_spi", "pn532_uart"
+    interface: "pn532_spi"  # or "pn532_i2c", "pn532_uart"
+    spi_bus: 1
+    spi_device: 2
+    cs_pin: 23
+    reset_pin: null  # GPIO pin for reset (optional)
     i2c_bus: 0
     i2c_address: 0x24
-    reset_pin: null  # GPIO pin for reset (optional)
 
   subghz:
     enabled: true
-    spi_bus: 0
+    spi_bus: 1
     spi_device: 1
     cs_pin: 24
     gdo0_pin: 25
@@ -54,6 +57,14 @@ hardware:
     freq_range: [300, 928]  # MHz
     modulation: "ASK_OOK"  # ASK_OOK, FSK, GFSK, MSK
     tx_power: 10  # dBm (-30 to +10)
+
+  nrf24:
+    enabled: true
+    spi_bus: 0
+    spi_device: 0
+    ce_pin: 7  # PA7 on Orange Pi (BOARD numbering)
+    lna_enable: true  # Enable LNA for better sensitivity
+    pa_level: 3  # 0: -18dBm, 1: -12dBm, 2: -6dBm, 3: 0dBm (or +20dBm for PA module)
 
   lora:
     enabled: false
@@ -106,8 +117,13 @@ ui:
 modules:
   autoload:
     - "subghz"
+    - "nrf24"
     - "nfc"
     - "wifi"
+    - "gps"
+    - "badusb"
+    - "bluetooth"
+    - "sdr"
     - "system"
 
   paths:

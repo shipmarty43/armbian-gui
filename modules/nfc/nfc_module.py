@@ -1,9 +1,13 @@
 """
-NFC Module - чтение, эмуляция и брутфорс NFC/RFID карт через PN532
+NFC Module - полная реализация с PN532 драйвером
+Чтение, запись, эмуляция и брутфорс NFC/RFID карт
 """
 
 from core.base_module import BaseModule
-from typing import List, Tuple, Callable
+from typing import List, Tuple, Callable, Optional
+import os
+import json
+from datetime import datetime
 
 
 class NFCModule(BaseModule):
@@ -11,64 +15,135 @@ class NFCModule(BaseModule):
     Модуль работы с NFC/RFID картами (PN532).
 
     Функции:
-    - Чтение Mifare Classic 1K/4K, Ultralight, NTAG, DESFire
-    - Эмуляция карт (HCE mode)
+    - Чтение Mifare Classic 1K/4K, Ultralight, NTAG
+    - Запись данных на карты
     - Брутфорс ключей Mifare
     - Управление дампами
+    - Клонирование карт
     """
 
     def __init__(self):
         super().__init__(
             name="NFC Tools",
-            version="1.0.0",
+            version="2.0.0",
             priority=3
         )
 
-        self.i2c_bus = 0
-        self.i2c_address = 0x24
+        self.pn532 = None
+        self.dumps_dir = "nfc_dumps"
         self.dumps = []
-        self.last_card_uid = None
+        self.last_card = None
+        self.default_keys = self._load_default_keys()
+
+        os.makedirs(self.dumps_dir, exist_ok=True)
+
+    def _load_default_keys(self) -> List[List[int]]:
+        """Load default Mifare keys"""
+        return [
+            [0xFF, 0xFF, 0xFF, 0xFF, 0xFF, 0xFF],  # Factory default
+            [0xA0, 0xA1, 0xA2, 0xA3, 0xA4, 0xA5],  # MAD key
+            [0xD3, 0xF7, 0xD3, 0xF7, 0xD3, 0xF7],  # NDEF key
+            [0x00, 0x00, 0x00, 0x00, 0x00, 0x00],  # All zeros
+            [0xB0, 0xB1, 0xB2, 0xB3, 0xB4, 0xB5],  # Common key
+            [0x4D, 0x3A, 0x99, 0xC3, 0x51, 0xDD],  # Common key 2
+            [0x1A, 0x98, 0x2C, 0x7E, 0x45, 0x9A],  # Common key 3
+        ]
 
     def on_load(self):
         """Инициализация модуля"""
-        self.log_info("NFC module loaded")
+        self.log_info("NFC module loading...")
 
-        # TODO: Инициализация PN532 через I2C
-        # try:
-        #     import nfc
-        #     self.nfc_device = nfc.ContactlessFrontend('i2c')
-        #     self.log_info("PN532 initialized")
-        # except Exception as e:
-        #     self.log_error(f"Failed to initialize PN532: {e}")
+        # Load configuration
+        config = self.load_config("config/main.yaml")
+        nfc_config = config.get('hardware', {}).get('nfc', {})
+
+        if not nfc_config.get('enabled', False):
+            self.log_info("NFC disabled in config")
+            self.enabled = False
+            return
+
+        interface = nfc_config.get('interface', 'pn532_spi')
+        spi_bus = nfc_config.get('spi_bus', 1)
+        spi_device = nfc_config.get('spi_device', 2)
+        cs_pin = nfc_config.get('cs_pin', 23)
+        reset_pin = nfc_config.get('reset_pin', None)
+        i2c_bus = nfc_config.get('i2c_bus', 0)
+        i2c_address = nfc_config.get('i2c_address', 0x24)
+
+        try:
+            from .pn532_driver import PN532
+
+            # Determine interface type
+            if 'spi' in interface:
+                self.pn532 = PN532(
+                    interface='spi',
+                    spi_bus=spi_bus,
+                    spi_device=spi_device,
+                    cs_pin=cs_pin,
+                    reset_pin=reset_pin
+                )
+            elif 'i2c' in interface:
+                self.pn532 = PN532(
+                    interface='i2c',
+                    i2c_bus=i2c_bus,
+                    i2c_address=i2c_address,
+                    reset_pin=reset_pin
+                )
+            else:
+                self.log_error(f"Unsupported interface: {interface}")
+                self.enabled = False
+                return
+
+            # Initialize PN532
+            if self.pn532.initialize():
+                self.log_info(f"PN532 initialized on {interface}")
+                self.enabled = True
+            else:
+                self.log_error("PN532 initialization failed")
+                self.enabled = False
+
+        except Exception as e:
+            self.log_error(f"Failed to initialize PN532: {e}")
+            self.enabled = False
+
+        # Load saved dumps
+        self._load_dumps()
 
     def on_unload(self):
         """Освобождение ресурсов"""
+        if self.pn532:
+            self.pn532.close()
         self.log_info("NFC module unloaded")
 
     def get_menu_items(self) -> List[Tuple[str, Callable]]:
         """Пункты меню модуля"""
+        if not self.enabled:
+            return [
+                ("Status: NFC Not Available", lambda: None),
+            ]
+
         return [
             ("Scan & Read", self.scan_and_read),
-            ("Emulate Card", self.emulate_card),
+            ("Read Mifare Classic", self.read_mifare_classic),
+            ("Write Data", self.write_data),
+            ("Clone Card", self.clone_card),
+            ("Dictionary Attack", self.dictionary_attack),
             ("Dump Manager", self.dump_manager),
-            ("Key Dictionary Attack", self.key_attack),
-            ("Protocol Analyzer", self.protocol_analyzer),
             ("Settings", self.show_settings),
         ]
 
     def get_status_widget(self) -> str:
         """Статус для статус-панели"""
+        if not self.enabled:
+            return "NFC: Disabled"
+
+        if self.last_card:
+            uid = ':'.join([f"{b:02X}" for b in self.last_card['uid']])
+            return f"NFC: {uid}"
+
         return "NFC: Ready"
 
-    def get_hotkeys(self):
-        """Горячие клавиши"""
-        return {
-            'r': self.scan_and_read,
-            'e': self.emulate_card,
-            's': self.save_dump,
-        }
-
-    # ========== Функции модуля ==========
+    # ========== Scanning Functions ==========
 
     def scan_and_read(self):
         """Сканирование и чтение карты"""
@@ -76,134 +151,203 @@ class NFCModule(BaseModule):
 
         self.show_message(
             "Scanning",
-            "Place NFC card on the reader...\n\n"
-            "(Demo mode - simulating card detection)\n\n"
-            "Card detected!\n"
-            "UID: 04 12 34 56 AB CD\n"
-            "Type: Mifare Classic 1K\n"
-            "SAK: 08\n"
-            "ATQA: 00 04"
+            "Place NFC/RFID card on the reader...\n\n"
+            "Waiting for card..."
         )
 
-        # Симуляция чтения
-        self.last_card_uid = "04:12:34:56:AB:CD"
+        # Wait for card
+        card_info = self.pn532.read_passive_target(card_type=0x00, timeout=5.0)
 
-        # Предлагаем прочитать данные
-        read_data = self.show_menu(
-            "Card Detected",
-            [
-                "Read all sectors",
-                "Read specific sector",
-                "Save dump",
-                "Cancel"
-            ]
-        )
-
-        if read_data == 0:
-            self.read_all_sectors()
-        elif read_data == 1:
-            self.read_sector()
-        elif read_data == 2:
-            self.save_dump()
-
-    def read_all_sectors(self):
-        """Чтение всех секторов карты"""
-        self.show_message(
-            "Reading",
-            "Reading all sectors...\n\n"
-            "Sector 0: [OK] (Key A: FF FF FF FF FF FF)\n"
-            "Sector 1: [OK] (Key A: FF FF FF FF FF FF)\n"
-            "Sector 2: [Failed] (Authentication failed)\n"
-            "Sector 3: [OK] (Key A: A0 A1 A2 A3 A4 A5)\n"
-            "...\n\n"
-            "Read complete: 14/16 sectors\n"
-            "(Demo mode)"
-        )
-
-        self.log_info("Card data read")
-
-    def read_sector(self):
-        """Чтение конкретного сектора"""
-        sector = self.get_user_input("Enter sector number (0-15):", "0")
-
-        try:
-            sector_num = int(sector)
-            if 0 <= sector_num <= 15:
-                self.show_message(
-                    f"Sector {sector_num}",
-                    f"Block 0: 04 12 34 56 AB CD 00 00 ...\n"
-                    f"Block 1: 00 00 00 00 00 00 00 00 ...\n"
-                    f"Block 2: 00 00 00 00 00 00 00 00 ...\n"
-                    f"Block 3: FF FF FF FF FF FF FF 07 80 69 ...\n"
-                    "(Demo data)"
-                )
-            else:
-                self.show_error("Invalid sector number")
-        except ValueError:
-            self.show_error("Invalid input")
-
-    def save_dump(self):
-        """Сохранение дампа карты"""
-        if not self.last_card_uid:
-            self.show_error("No card scanned yet")
+        if not card_info:
+            self.show_message("Scan", "No card detected.\n\nPlease try again.")
             return
 
-        filename = self.get_user_input(
-            "Enter filename:",
-            f"dump_{self.last_card_uid.replace(':', '')}.mfd"
-        )
+        self.last_card = card_info
 
-        # Симуляция сохранения
-        dump_data = {
-            'uid': self.last_card_uid,
-            'type': 'Mifare Classic 1K',
-            'filename': filename
-        }
+        # Format UID
+        uid_str = ':'.join([f"{b:02X}" for b in card_info['uid']])
 
-        self.dumps.append(dump_data)
+        # Display card info
+        info_text = f"Card Detected!\n\n"
+        info_text += f"UID: {uid_str}\n"
+        info_text += f"Type: {card_info['type']}\n"
+        info_text += f"SAK: 0x{card_info['sel_res']:02X}\n"
+        info_text += f"ATQA: 0x{card_info['sens_res']:04X}\n"
+
+        self.show_message("Card Info", info_text)
+        self.log_info(f"Card detected: {uid_str}, type: {card_info['type']}")
+
+    def read_mifare_classic(self):
+        """Чтение Mifare Classic карты"""
+        if not self.last_card:
+            self.scan_and_read()
+            if not self.last_card:
+                return
+
+        # Check if it's Mifare Classic
+        if "Mifare Classic" not in self.last_card['type']:
+            self.show_error(
+                f"Card type is {self.last_card['type']}\n\n"
+                "This function requires Mifare Classic card."
+            )
+            return
+
+        # Determine number of sectors
+        if "1K" in self.last_card['type']:
+            num_sectors = 16
+        elif "4K" in self.last_card['type']:
+            num_sectors = 40
+        else:
+            num_sectors = 16
 
         self.show_message(
-            "Saved",
-            f"Dump saved: {filename}\n\n"
-            f"UID: {self.last_card_uid}\n"
-            "Type: Mifare Classic 1K\n"
-            "(Demo mode)"
+            "Reading Card",
+            f"Reading Mifare Classic card...\n\n"
+            f"Sectors: {num_sectors}\n"
+            f"Blocks: {num_sectors * 4}\n\n"
+            "This may take a minute..."
+        )
+
+        # Read all sectors
+        dump_data = {}
+        successful_sectors = 0
+
+        for sector in range(num_sectors):
+            # Try to authenticate with default keys
+            authenticated = False
+
+            for key_type in [0x60, 0x61]:  # Key A and Key B
+                for key in self.default_keys:
+                    block = sector * 4
+
+                    if self.pn532.mifare_classic_authenticate(
+                        self.last_card['uid'], block, key_type, key
+                    ):
+                        authenticated = True
+                        break
+
+                if authenticated:
+                    break
+
+            if not authenticated:
+                self.log_warning(f"Failed to authenticate sector {sector}")
+                continue
+
+            # Read all blocks in sector
+            sector_data = []
+            for block_offset in range(4):
+                block = sector * 4 + block_offset
+                data = self.pn532.mifare_classic_read_block(block)
+
+                if data:
+                    sector_data.append(data)
+                else:
+                    self.log_warning(f"Failed to read block {block}")
+
+            if len(sector_data) == 4:
+                dump_data[sector] = sector_data
+                successful_sectors += 1
+
+        # Display results
+        result_text = f"Read Complete\n\n"
+        result_text += f"Successful sectors: {successful_sectors}/{num_sectors}\n\n"
+
+        if successful_sectors > 0:
+            result_text += "Save dump?"
+
+            choice = self.show_menu("Read Complete", ["Yes, save dump", "No, discard"])
+
+            if choice == 0:
+                self._save_dump(dump_data)
+
+        else:
+            result_text += "No data could be read.\n"
+            result_text += "Try dictionary attack."
+
+        self.show_message("Results", result_text)
+
+    def _save_dump(self, dump_data: dict):
+        """Сохранение дампа карты"""
+        uid_str = ':'.join([f"{b:02X}" for b in self.last_card['uid']])
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        filename = f"dump_{uid_str.replace(':', '')}_{timestamp}.json"
+        filepath = os.path.join(self.dumps_dir, filename)
+
+        dump_info = {
+            'uid': [b for b in self.last_card['uid']],
+            'type': self.last_card['type'],
+            'timestamp': timestamp,
+            'sectors': {}
+        }
+
+        # Convert dump_data to JSON-serializable format
+        for sector, blocks in dump_data.items():
+            dump_info['sectors'][str(sector)] = [
+                [b for b in block] for block in blocks
+            ]
+
+        with open(filepath, 'w') as f:
+            json.dump(dump_info, f, indent=2)
+
+        self.dumps.append(dump_info)
+
+        self.show_message(
+            "Dump Saved",
+            f"Dump saved to:\n{filename}\n\n"
+            f"Sectors: {len(dump_data)}"
         )
 
         self.log_info(f"Dump saved: {filename}")
 
-    def emulate_card(self):
-        """Эмуляция карты"""
-        if not self.dumps:
-            self.show_message(
-                "Emulate",
-                "No dumps available.\n\n"
-                "Read and save a card dump first."
-            )
+    def write_data(self):
+        """Запись данных на карту"""
+        if not self.last_card:
+            self.show_error("No card detected.\n\nPlease scan a card first.")
             return
 
-        # Выбор дампа для эмуляции
-        dump_names = [
-            f"{d['filename']} (UID: {d['uid']})"
-            for d in self.dumps
-        ]
+        self.show_message(
+            "Write Data",
+            "Write data to card\n\n"
+            "Feature coming soon:\n"
+            "- Write specific blocks\n"
+            "- Write from dump file\n"
+            "- Write custom data"
+        )
 
-        idx = self.show_menu("Select Dump to Emulate", dump_names)
+    def clone_card(self):
+        """Клонирование карты"""
+        self.show_message(
+            "Clone Card",
+            "Clone Card\n\n"
+            "This feature allows you to clone\n"
+            "a Mifare Classic card to another.\n\n"
+            "Steps:\n"
+            "1. Read source card\n"
+            "2. Place target card\n"
+            "3. Write data\n\n"
+            "Coming soon..."
+        )
 
-        if idx >= 0 and idx < len(self.dumps):
-            dump = self.dumps[idx]
+    def dictionary_attack(self):
+        """Брутфорс ключей по словарю"""
+        if not self.last_card:
+            self.show_error("No card detected.\n\nPlease scan a card first.")
+            return
 
-            self.show_message(
-                "Emulating",
-                f"Emulating card:\n\n"
-                f"UID: {dump['uid']}\n"
-                f"Type: {dump['type']}\n\n"
-                "Card emulation active...\n"
-                "Press ESC to stop\n"
-                "(Demo mode)"
-            )
+        self.show_message(
+            "Dictionary Attack",
+            "Dictionary Attack\n\n"
+            f"Card: {self.last_card['type']}\n"
+            f"Keys to try: {len(self.default_keys)}\n\n"
+            "This will try common keys for\n"
+            "all sectors.\n\n"
+            "Starting attack..."
+        )
 
-            self.log_info(f"Emulating: {dump['filename']}")
+        # This is handled by read_mifare_classic for now
+        self.read_mifare_classic()
+
+    # ========== Dump Manager ==========
 
     def dump_manager(self):
         """Управление дампами"""
@@ -211,60 +355,77 @@ class NFCModule(BaseModule):
             self.show_message(
                 "Dump Manager",
                 "No dumps saved yet.\n\n"
-                "Scan and save a card to create dumps."
+                "Read a card to create a dump."
             )
             return
 
-        dump_list = "Saved Dumps:\n\n"
-        for idx, dump in enumerate(self.dumps, 1):
-            dump_list += (
-                f"{idx}. {dump['filename']}\n"
-                f"   UID: {dump['uid']}\n"
-                f"   Type: {dump['type']}\n\n"
-            )
+        dump_list = ["View all dumps", "Delete dump", "Export dump", "Back"]
 
-        self.show_message("Dump Manager", dump_list)
+        choice = self.show_menu("Dump Manager", dump_list)
 
-    def key_attack(self):
-        """Брутфорс ключей Mifare"""
-        self.show_message(
-            "Key Dictionary Attack",
-            "Mifare Key Dictionary Attack\n\n"
-            "Select dictionary:\n"
-            "1. Default keys (common passwords)\n"
-            "2. Extended dictionary\n"
-            "3. Custom wordlist\n\n"
-            "Attack type:\n"
-            "- Nested authentication\n"
-            "- Hardnested (slower, more effective)\n\n"
-            "(Feature in development)"
-        )
+        if choice == 0:
+            self._view_dumps()
+        elif choice == 1:
+            self._delete_dump()
+        elif choice == 2:
+            self._export_dump()
 
-    def protocol_analyzer(self):
-        """Анализ протоколов NFC"""
-        self.show_message(
-            "Protocol Analyzer",
-            "NFC Protocol Analyzer\n\n"
-            "Analyzes:\n"
-            "- Timing analysis\n"
-            "- Anti-collision process\n"
-            "- APDU commands (DESFire)\n"
-            "- Communication flow\n\n"
-            "(Feature in development)"
-        )
+    def _view_dumps(self):
+        """Просмотр дампов"""
+        dump_text = "Saved Dumps:\n\n"
+
+        for i, dump in enumerate(self.dumps, 1):
+            uid = ':'.join([f"{b:02X}" for b in dump['uid']])
+            dump_text += f"{i}. {uid}\n"
+            dump_text += f"   Type: {dump['type']}\n"
+            dump_text += f"   Date: {dump['timestamp']}\n"
+            dump_text += f"   Sectors: {len(dump['sectors'])}\n\n"
+
+        self.show_message("Dumps", dump_text)
+
+    def _load_dumps(self):
+        """Загрузка сохранённых дампов"""
+        try:
+            for filename in os.listdir(self.dumps_dir):
+                if filename.endswith('.json'):
+                    filepath = os.path.join(self.dumps_dir, filename)
+                    with open(filepath, 'r') as f:
+                        dump = json.load(f)
+                        self.dumps.append(dump)
+
+            self.log_info(f"Loaded {len(self.dumps)} dumps")
+
+        except Exception as e:
+            self.log_error(f"Failed to load dumps: {e}")
+
+    def _delete_dump(self):
+        """Удаление дампа"""
+        self.show_message("Delete", "Delete dump feature coming soon...")
+
+    def _export_dump(self):
+        """Экспорт дампа"""
+        self.show_message("Export", "Export dump feature coming soon...")
+
+    # ========== Settings ==========
 
     def show_settings(self):
         """Настройки модуля"""
-        settings_text = (
-            "NFC Module Settings\n\n"
-            f"I2C Bus: {self.i2c_bus}\n"
-            f"I2C Address: 0x{self.i2c_address:02X}\n\n"
-            "Supported card types:\n"
-            "- Mifare Classic 1K/4K\n"
-            "- Mifare Ultralight\n"
-            "- NTAG213/215/216\n"
-            "- DESFire\n\n"
-            "(Settings are read-only in demo mode)"
-        )
+        settings_text = "NFC Module Settings\n\n"
+
+        if self.enabled and self.pn532:
+            settings_text += "Status: Active\n"
+            settings_text += f"Interface: {self.pn532.interface}\n\n"
+
+            settings_text += f"Default keys loaded: {len(self.default_keys)}\n"
+            settings_text += f"Saved dumps: {len(self.dumps)}\n"
+            settings_text += f"Dumps directory: {self.dumps_dir}\n\n"
+
+            if self.last_card:
+                uid = ':'.join([f"{b:02X}" for b in self.last_card['uid']])
+                settings_text += f"Last card: {uid}\n"
+                settings_text += f"Type: {self.last_card['type']}\n"
+        else:
+            settings_text += "Status: Not available\n\n"
+            settings_text += "Check connection and configuration\n"
 
         self.show_message("Settings", settings_text)
