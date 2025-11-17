@@ -406,18 +406,21 @@ class UIManager:
 
         box = urwid.LineBox(pile, title=title)
 
-        # Показываем как overlay поверх текущего body
+        # ВАЖНО: Сохраняем текущий body ДО создания overlay
+        current_body = self.frame.body
+
+        # Создаем overlay с сохраненным body как базой
         overlay = urwid.Overlay(
             box,
-            self.frame.body,
+            current_body,  # Используем сохраненную ссылку, не self.frame.body
             align='center',
             width=('relative', 80),
             valign='middle',
             height=('relative', 60)
         )
 
-        # Сохраняем текущий body и заменяем на overlay
-        self.view_stack.append(self.frame.body)
+        # Сохраняем в стек и устанавливаем overlay
+        self.view_stack.append(current_body)
         self.frame.body = overlay
 
     def close_overlay(self):
