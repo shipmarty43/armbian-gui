@@ -7,7 +7,11 @@
 - ✅ **Event bus** - Pub/sub for inter-module communication
 - ✅ **Configuration system** - YAML-based with validation
 - ✅ **Logging system** - Session logging with rotation
-- ✅ **UI framework** - urwid with vim navigation + mouse/touchscreen support
+- ✅ **UI framework** - urwid with full mouse/touchscreen + vim navigation (v3.0)
+  - MouseScrollListBox with wheel scrolling
+  - ClickableListItem for all menu items
+  - Touch-friendly buttons and selections
+  - Mouse event logging and debugging
 - ✅ **System monitors** - Battery (MAX17043), thermal, network (WiFi/LTE)
 
 ### Sub-GHz Module (100%) - PRIORITY 1

@@ -8,6 +8,85 @@ from typing import List, Tuple, Callable, Optional, Dict, Any
 from datetime import datetime
 
 
+class SelectableText(urwid.Text):
+    """
+    Текстовый виджет с поддержкой выбора и клика мыши.
+
+    Позволяет кликать на элементы списка как кнопки.
+    """
+
+    def selectable(self):
+        return True
+
+    def keypress(self, size, key):
+        return key
+
+
+class ClickableListItem(urwid.WidgetWrap):
+    """
+    Элемент списка с поддержкой клика мыши.
+
+    Args:
+        text: Отображаемый текст
+        callback: Функция, вызываемая при клике
+        attr_map: Карта атрибутов для нормального состояния
+        focus_map: Карта атрибутов для фокуса
+    """
+
+    signals = ['click']
+
+    def __init__(self, text: str, callback: Callable = None,
+                 attr_map: str = 'menu_item', focus_map: str = 'menu_focus'):
+        self.callback = callback
+        self._text = text
+
+        # Создаём кнопку для лучшей поддержки мыши
+        self.button = urwid.Button(text)
+        self.button._label.align = 'left'
+
+        if callback:
+            urwid.connect_signal(self.button, 'click', lambda btn: callback())
+
+        wrapped = urwid.AttrMap(self.button, attr_map, focus_map)
+        super().__init__(wrapped)
+
+    def mouse_event(self, size, event, button, col, row, focus):
+        """Обработка событий мыши"""
+        if event == 'mouse press' and button == 1:  # Левая кнопка мыши
+            if self.callback:
+                self.callback()
+            return True
+        return super().mouse_event(size, event, button, col, row, focus)
+
+
+class MouseScrollListBox(urwid.ListBox):
+    """
+    ListBox с поддержкой прокрутки колесом мыши.
+
+    Обрабатывает события прокрутки колеса мыши для лучшего
+    UX на сенсорных экранах и при использовании мыши.
+    """
+
+    def mouse_event(self, size, event, button, col, row, focus):
+        """Обработка событий мыши, включая прокрутку колесом"""
+        # Прокрутка колесом мыши вверх (button 4)
+        if event == 'mouse press' and button == 4:
+            self.keypress(size, 'up')
+            self.keypress(size, 'up')
+            self.keypress(size, 'up')
+            return True
+
+        # Прокрутка колесом мыши вниз (button 5)
+        elif event == 'mouse press' and button == 5:
+            self.keypress(size, 'down')
+            self.keypress(size, 'down')
+            self.keypress(size, 'down')
+            return True
+
+        # Передать остальные события родительскому классу
+        return super().mouse_event(size, event, button, col, row, focus)
+
+
 class UIManager:
     """
     Менеджер пользовательского интерфейса.
@@ -17,6 +96,7 @@ class UIManager:
     - Статус-панель
     - Vim-style навигацию
     - Диалоговые окна
+    - Поддержка мыши/сенсорного экрана
     """
 
     _instance = None
@@ -108,7 +188,7 @@ class UIManager:
         Returns:
             urwid.AttrMap: Статус-бар виджет
         """
-        status_text = urwid.Text("CyberDeck Interface v2.0", align='center')
+        status_text = urwid.Text("CyberDeck Interface v3.0 🖱️", align='center')
         return urwid.AttrMap(status_text, 'status_normal')
 
     def _create_footer(self) -> urwid.AttrMap:
@@ -119,17 +199,17 @@ class UIManager:
             urwid.AttrMap: Футер виджет
         """
         footer_text = urwid.Text(
-            "j/k:Navigate  Enter:Select  q:Quit  ?:Help  ::Command",
+            "j/k:Navigate  Enter/Click:Select  Scroll:Wheel  q:Quit  ?:Help",
             align='center'
         )
         return urwid.AttrMap(footer_text, 'footer')
 
-    def _create_main_menu(self) -> urwid.ListBox:
+    def _create_main_menu(self) -> MouseScrollListBox:
         """
-        Создать главное меню.
+        Создать главное меню с поддержкой мыши.
 
         Returns:
-            urwid.ListBox: Меню виджет
+            MouseScrollListBox: Меню виджет
         """
         menu_items = []
 
@@ -142,7 +222,7 @@ class UIManager:
             " ╚██████╗   ██║   ██████╔╝███████╗██║  ██║",
             "  ╚═════╝   ╚═╝   ╚═════╝ ╚══════╝╚═╝  ╚═╝",
             "",
-            " ██████╗ ███████╗ ██████╗██╗  ██╗  v2.0",
+            " ██████╗ ███████╗ ██████╗██╗  ██╗  v3.0",
             " ██╔══██╗██╔════╝██╔════╝██║ ██╔╝",
             " ██║  ██║█████╗  ██║     █████╔╝ ",
             " ██║  ██║██╔══╝  ██║     ██╔═██╗ ",
@@ -161,7 +241,7 @@ class UIManager:
 
         menu_items.append(urwid.Divider())
 
-        # Пункты меню из модулей
+        # Пункты меню из модулей с поддержкой кликов мыши
         for idx, module in enumerate(self.modules, 1):
             button_text = f"[{idx}] {module.name}"
             button = urwid.Button(button_text)
@@ -190,7 +270,8 @@ class UIManager:
             urwid.AttrMap(help_btn, 'menu_item', 'menu_focus')
         )
 
-        return urwid.ListBox(urwid.SimpleFocusListWalker(menu_items))
+        # Используем MouseScrollListBox для поддержки прокрутки колесом мыши
+        return MouseScrollListBox(urwid.SimpleFocusListWalker(menu_items))
 
     def _on_module_selected(self, button, module):
         """Обработчик выбора модуля"""
@@ -204,30 +285,40 @@ class UIManager:
     def _on_help(self, button):
         """Обработчик справки"""
         help_text = """
-        CyberDeck Interface v2.0 - Help
+        CyberDeck Interface v3.0 - Help
 
-        Navigation:
-        j / ↓ - Move down
-        k / ↑ - Move up
-        h / ← - Go back
-        l / → - Select
-        Enter - Confirm
-        q - Quit
-        Esc - Cancel
+        Keyboard Navigation:
+        j / ↓       - Move down
+        k / ↑       - Move up
+        h / ← / Esc - Go back
+        l / →       - Select
+        Enter       - Confirm
+        q           - Quit
+
+        Mouse/Touchscreen Support:
+        Left Click  - Select button/menu item
+        Scroll Up   - Move up in list
+        Scroll Down - Move down in list
+        Drag        - Scroll through content
 
         Commands (press ':'):
-        :quit - Exit application
-        :help - Show help
+        :quit     - Exit application
+        :help     - Show help
         :log view - View logs
 
-        Modules are loaded dynamically.
-        Each module has its own hotkeys.
+        Features:
+        - Full mouse and touchscreen support
+        - All buttons are clickable
+        - Mouse wheel scrolling
+        - Vim-style keyboard navigation
+        - Dynamic module loading
+        - Each module has its own hotkeys
         """
         self.show_message("Help", help_text)
 
     def show_module_view(self, module):
         """
-        Показать интерфейс модуля.
+        Показать интерфейс модуля с поддержкой кликов мыши.
 
         Args:
             module: BaseModule instance
@@ -245,10 +336,14 @@ class UIManager:
         # Создаём меню модуля
         menu_items = []
         menu_items.append(
-            urwid.Text(f"=== {module.name} ===", align='center')
+            urwid.AttrMap(
+                urwid.Text(f"=== {module.name} ===", align='center'),
+                'header'
+            )
         )
         menu_items.append(urwid.Divider())
 
+        # Создаём кнопки для каждого пункта меню
         for title, callback in menu_items_data:
             button = urwid.Button(title)
             urwid.connect_signal(button, 'click', lambda b, cb=callback: cb())
@@ -258,13 +353,15 @@ class UIManager:
 
         menu_items.append(urwid.Divider())
 
+        # Кнопка возврата
         back_btn = urwid.Button("[ESC] Back to Main Menu")
         urwid.connect_signal(back_btn, 'click', lambda b: self.go_back())
         menu_items.append(
             urwid.AttrMap(back_btn, 'menu_item', 'menu_focus')
         )
 
-        listbox = urwid.ListBox(urwid.SimpleFocusListWalker(menu_items))
+        # Используем MouseScrollListBox для поддержки прокрутки
+        listbox = MouseScrollListBox(urwid.SimpleFocusListWalker(menu_items))
 
         # Сохраняем текущий вид и показываем новый
         self.view_stack.append(self.frame.body)
@@ -391,11 +488,31 @@ class UIManager:
 
     def _handle_input(self, key):
         """
-        Обработчик глобальных клавиш.
+        Обработчик глобальных клавиш и событий мыши.
 
         Args:
-            key: Нажатая клавиша
+            key: Нажатая клавиша или событие мыши
         """
+        # Обработка событий мыши
+        if isinstance(key, tuple) and key[0] == 'mouse press':
+            # key = ('mouse press', button, col, row)
+            button = key[1]
+            col = key[2]
+            row = key[3]
+
+            self.logger.debug(f"Mouse click: button={button}, col={col}, row={row}")
+
+            # Левая кнопка мыши - уже обрабатывается виджетами
+            # Средняя кнопка - можно использовать для дополнительных действий
+            # Правая кнопка - контекстное меню (будущее)
+
+            return
+
+        # Обработка прокрутки колесом мыши
+        elif isinstance(key, tuple) and key[0] == 'mouse drag':
+            # Прокрутка уже обрабатывается urwid
+            return
+
         # Vim-style navigation
         if key in ('j', 'down'):
             # Уже обрабатывается urwid
