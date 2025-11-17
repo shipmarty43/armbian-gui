@@ -121,6 +121,9 @@ modules:
     - "nfc"
     - "wifi"
     - "gps"
+    - "badusb"
+    - "bluetooth"
+    - "sdr"
     - "system"
 
   paths:
