@@ -108,6 +108,7 @@ modules:
     - "subghz"
     - "nfc"
     - "wifi"
+    - "gps"
     - "system"
 
   paths:
