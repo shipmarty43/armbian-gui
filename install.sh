@@ -7,7 +7,7 @@ INSTALL_DIR="$(pwd)"
 CONDA_DIR="$HOME/miniconda3"
 
 echo "========================================"
-echo "CyberDeck Interface v2.0 - Installation"
+echo "CyberDeck Interface v3.0 - Installation"
 echo "========================================"
 echo ""
 
@@ -20,6 +20,8 @@ fi
 
 # 1. Check for Miniconda
 echo "[1/6] Checking for Conda..."
+CONDA_INSTALLED=false
+
 if ! command -v conda &> /dev/null; then
     echo "Conda not found. Installing Miniconda..."
 
@@ -35,13 +37,28 @@ if ! command -v conda &> /dev/null; then
     bash /tmp/miniconda.sh -b -p $CONDA_DIR
     rm /tmp/miniconda.sh
 
-    # Initialize conda
+    # Initialize conda for bash
     $CONDA_DIR/bin/conda init bash
-    source ~/.bashrc
 
     echo "Miniconda installed successfully"
+    CONDA_INSTALLED=true
+
+    # Source conda for current session
+    if [ -f "$CONDA_DIR/etc/profile.d/conda.sh" ]; then
+        source "$CONDA_DIR/etc/profile.d/conda.sh"
+    fi
+
+    # Reinitialize conda in current shell
+    eval "$($CONDA_DIR/bin/conda shell.bash hook)"
+
 else
     echo "Conda found: $(which conda)"
+    # Make sure conda is initialized in current session
+    if [ -f "$CONDA_DIR/etc/profile.d/conda.sh" ]; then
+        source "$CONDA_DIR/etc/profile.d/conda.sh"
+    elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+        source "$HOME/anaconda3/etc/profile.d/conda.sh"
+    fi
 fi
 
 # 2. Create Conda environment
@@ -78,8 +95,10 @@ echo "[5/6] Setting permissions..."
 # Make main.py executable
 chmod +x core/main.py
 
-# Create launcher script
-cat > cyberdeck <<'EOF'
+# Create launcher script if it doesn't exist
+if [ ! -f "cyberdeck" ]; then
+    echo "Creating launcher script..."
+    cat > cyberdeck <<'EOF'
 #!/bin/bash
 # CyberDeck Interface Launcher
 
@@ -91,8 +110,11 @@ conda activate cyberdeck
 
 python core/main.py "$@"
 EOF
-
-chmod +x cyberdeck
+    chmod +x cyberdeck
+else
+    echo "Launcher script already exists, skipping..."
+    chmod +x cyberdeck
+fi
 
 # 6. Optional: Add to PATH
 echo ""

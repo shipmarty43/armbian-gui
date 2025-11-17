@@ -32,8 +32,8 @@ def parse_args():
 
     parser.add_argument(
         '-c', '--config',
-        default='config/main.yaml',
-        help='Path to main configuration file'
+        default='main.yaml',
+        help='Path to main configuration file (relative to config/ directory)'
     )
 
     parser.add_argument(

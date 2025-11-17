@@ -1,0 +1,125 @@
+#!/bin/bash
+#
+# CyberDeck Interface v3.0 - Launcher Script
+#
+# Запускает CyberDeck interface с правильными настройками окружения
+#
+
+# Цвета для вывода
+RED='\033[0;31m'
+GREEN='\033[0;32m'
+YELLOW='\033[1;33m'
+BLUE='\033[0;34m'
+NC='\033[0m' # No Color
+
+# Получаем директорию скрипта
+SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
+cd "$SCRIPT_DIR"
+
+# Баннер
+echo -e "${BLUE}"
+cat << "EOF"
+  ██████╗██╗   ██╗██████╗ ███████╗██████╗
+ ██╔════╝╚██╗ ██╔╝██╔══██╗██╔════╝██╔══██╗
+ ██║      ╚████╔╝ ██████╔╝█████╗  ██████╔╝
+ ██║       ╚██╔╝  ██╔══██╗██╔══╝  ██╔══██╗
+ ╚██████╗   ██║   ██████╔╝███████╗██║  ██║
+  ╚═════╝   ╚═╝   ╚═════╝ ╚══════╝╚═╝  ╚═╝
+
+ ██████╗ ███████╗ ██████╗██╗  ██╗  v3.0
+ ██╔══██╗██╔════╝██╔════╝██║ ██╔╝
+ ██║  ██║█████╗  ██║     █████╔╝
+ ██║  ██║██╔══╝  ██║     ██╔═██╗
+ ██████╔╝███████╗╚██████╗██║  ██╗
+ ╚═════╝ ╚══════╝ ╚═════╝╚═╝  ╚═╝
+EOF
+echo -e "${NC}"
+
+echo -e "${GREEN}Starting CyberDeck Interface...${NC}\n"
+
+# Проверка наличия conda
+if command -v conda &> /dev/null; then
+    # Conda установлена
+    echo -e "${BLUE}[*]${NC} Conda detected"
+
+    # Инициализация conda для bash (если еще не инициализирована)
+    if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
+        source "$HOME/miniconda3/etc/profile.d/conda.sh"
+    elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
+        source "$HOME/anaconda3/etc/profile.d/conda.sh"
+    fi
+
+    # Проверка существования окружения cyberdeck
+    if conda env list | grep -q "cyberdeck"; then
+        echo -e "${BLUE}[*]${NC} Activating 'cyberdeck' environment..."
+        conda activate cyberdeck
+
+        if [ $? -eq 0 ]; then
+            echo -e "${GREEN}[✓]${NC} Environment activated"
+        else
+            echo -e "${YELLOW}[!]${NC} Failed to activate environment, using base"
+        fi
+    else
+        echo -e "${YELLOW}[!]${NC} Environment 'cyberdeck' not found"
+        echo -e "${YELLOW}[!]${NC} Run: ${BLUE}bash install.sh${NC} to create it"
+        echo -e "${YELLOW}[!]${NC} Using current Python environment..."
+    fi
+else
+    # Conda не установлена
+    echo -e "${YELLOW}[!]${NC} Conda not found, using system Python"
+fi
+
+# Проверка Python версии
+PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+echo -e "${BLUE}[*]${NC} Python version: $PYTHON_VERSION"
+
+# Проверка зависимостей
+echo -e "${BLUE}[*]${NC} Checking dependencies..."
+if ! python3 -c "import urwid" 2>/dev/null; then
+    echo -e "${RED}[✗]${NC} Missing dependency: urwid"
+    echo -e "${YELLOW}[!]${NC} Run: ${BLUE}pip install urwid${NC}"
+    exit 1
+fi
+
+if ! python3 -c "import yaml" 2>/dev/null; then
+    echo -e "${RED}[✗]${NC} Missing dependency: PyYAML"
+    echo -e "${YELLOW}[!]${NC} Run: ${BLUE}pip install pyyaml${NC}"
+    exit 1
+fi
+
+echo -e "${GREEN}[✓]${NC} All dependencies found\n"
+
+# Проверка конфигурации
+if [ ! -f "config/main.yaml" ]; then
+    echo -e "${RED}[✗]${NC} Configuration file not found: config/main.yaml"
+    exit 1
+fi
+
+# Проверка прав для hardware access (предупреждение, не фатально)
+if ! groups | grep -q "gpio\|spi\|i2c"; then
+    echo -e "${YELLOW}[!]${NC} Your user is not in gpio/spi/i2c groups"
+    echo -e "${YELLOW}[!]${NC} Hardware modules may not work properly"
+    echo -e "${YELLOW}[!]${NC} Run: ${BLUE}sudo usermod -a -G gpio,spi,i2c \$USER${NC}"
+    echo -e "${YELLOW}[!]${NC} Then logout and login again\n"
+fi
+
+# Запуск приложения
+echo -e "${GREEN}[*]${NC} Launching CyberDeck Interface...\n"
+echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
+
+# Передаем все аргументы командной строки в Python скрипт
+python3 core/main.py "$@"
+
+EXIT_CODE=$?
+
+# Обработка выхода
+echo -e "\n${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+
+if [ $EXIT_CODE -eq 0 ]; then
+    echo -e "${GREEN}[✓]${NC} CyberDeck Interface stopped normally"
+else
+    echo -e "${RED}[✗]${NC} CyberDeck Interface exited with error code: $EXIT_CODE"
+    echo -e "${YELLOW}[!]${NC} Check logs in: ${BLUE}logs/${NC}"
+fi
+
+exit $EXIT_CODE
