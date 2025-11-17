@@ -13,9 +13,12 @@ echo ""
 
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then
-   echo "Warning: Running as root. This is not recommended."
-   echo "Press Ctrl+C to cancel or Enter to continue..."
-   read
+   echo "Running as root - Hardware access enabled"
+   # Adjust conda directory for root
+   CONDA_DIR="/root/miniconda3"
+else
+   echo "Running as user: $USER"
+   echo "Note: You may need root privileges for hardware access (GPIO/SPI/I2C)"
 fi
 
 # 1. Check for Miniconda

@@ -1,0 +1,256 @@
+# Запуск CyberDeck от Root
+
+## Зачем нужен Root?
+
+Для доступа к аппаратным интерфейсам (GPIO, SPI, I2C, UART) на Orange Pi / Raspberry Pi обычно требуются права суперпользователя.
+
+CyberDeck поддерживает два режима работы:
+
+1. **От обычного пользователя** - для разработки и тестирования UI без железа
+2. **От root** - для полного доступа к аппаратным модулям
+
+## Установка для Root
+
+### Вариант 1: Установка непосредственно от root
+
+```bash
+# Войдите как root
+sudo su -
+
+# Перейдите в директорию проекта
+cd /home/user/armbian-gui
+
+# Запустите установку
+bash install.sh
+
+# Это установит Miniconda в /root/miniconda3
+# и создаст окружение cyberdeck для root
+```
+
+### Вариант 2: Использование существующей установки
+
+Если вы уже установили CyberDeck как обычный пользователь:
+
+```bash
+# Запускайте просто через sudo
+sudo ./cyberdeck
+```
+
+**Внимание:** При использовании `sudo`, conda окружение может не активироваться автоматически. В этом случае:
+
+```bash
+# Запустите напрямую с Python от root
+sudo /home/user/miniconda3/envs/cyberdeck/bin/python core/main.py
+```
+
+## Способы запуска
+
+### 1. Через launcher с sudo
+
+```bash
+sudo ./cyberdeck
+```
+
+### 2. Прямой запуск Python
+
+```bash
+# Активируйте conda окружение root
+sudo su -
+conda activate cyberdeck
+cd /home/user/armbian-gui
+python core/main.py
+```
+
+### 3. С помощью systemd service (рекомендуется)
+
+Создайте systemd service для автозапуска:
+
+```bash
+sudo nano /etc/systemd/system/cyberdeck.service
+```
+
+Содержимое файла:
+
+```ini
+[Unit]
+Description=CyberDeck Interface
+After=network.target
+
+[Service]
+Type=simple
+User=root
+WorkingDirectory=/home/user/armbian-gui
+Environment="PATH=/root/miniconda3/envs/cyberdeck/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/root/miniconda3/envs/cyberdeck/bin/python /home/user/armbian-gui/core/main.py --no-ui
+Restart=on-failure
+RestartSec=10
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Активация service:
+
+```bash
+# Перезагрузите systemd
+sudo systemctl daemon-reload
+
+# Включите автозапуск
+sudo systemctl enable cyberdeck
+
+# Запустите сервис
+sudo systemctl start cyberdeck
+
+# Проверьте статус
+sudo systemctl status cyberdeck
+
+# Логи
+sudo journalctl -u cyberdeck -f
+```
+
+## Безопасность
+
+### Рекомендации при работе от root:
+
+1. **Используйте только на изолированных устройствах**
+   - Orange Pi в качестве dedicated cyberdeck
+   - Не используйте на production серверах
+
+2. **Минимизируйте время работы от root**
+   - Для разработки используйте обычного пользователя
+   - Root только для реального использования с железом
+
+3. **Альтернатива: udev rules и группы**
+
+   Вместо root можно настроить права доступа:
+
+   ```bash
+   # Добавьте пользователя в группы
+   sudo usermod -a -G gpio,spi,i2c,dialout $USER
+
+   # Создайте udev правила для SPI
+   sudo nano /etc/udev/rules.d/50-spi.rules
+   ```
+
+   Содержимое `50-spi.rules`:
+   ```
+   SUBSYSTEM=="spidev", GROUP="spi", MODE="0660"
+   SUBSYSTEM=="gpio", GROUP="gpio", MODE="0660"
+   ```
+
+   После этого:
+   ```bash
+   # Перезагрузите udev
+   sudo udevadm control --reload-rules
+   sudo udevadm trigger
+
+   # Перелогиньтесь
+   logout
+   ```
+
+## Отладка проблем с правами
+
+### Проверка доступа к устройствам:
+
+```bash
+# Проверьте SPI
+ls -l /dev/spidev*
+
+# Проверьте I2C
+ls -l /dev/i2c*
+
+# Проверьте GPIO
+ls -l /sys/class/gpio
+
+# Проверьте текущие группы пользователя
+groups
+
+# Проверьте права на запись
+# Как обычный пользователь:
+echo "test" > /dev/spidev0.0
+# Должно быть "Permission denied" если нет прав
+
+# Как root:
+sudo echo "test" > /dev/spidev0.0
+# Должно работать
+```
+
+### Тестирование модулей:
+
+```bash
+# Запустите с отладкой
+sudo ./cyberdeck --log-level DEBUG
+
+# Проверьте логи
+tail -f logs/cyberdeck_*.log
+```
+
+## Headless режим (без UI)
+
+Для работы в фоне на Orange Pi без монитора:
+
+```bash
+# Запуск без UI
+sudo ./cyberdeck --no-ui
+
+# Или через Python
+sudo /root/miniconda3/envs/cyberdeck/bin/python core/main.py --no-ui
+```
+
+## Автозапуск при загрузке
+
+### Через crontab (простой способ):
+
+```bash
+# Откройте crontab для root
+sudo crontab -e
+
+# Добавьте строку:
+@reboot cd /home/user/armbian-gui && ./cyberdeck --no-ui > /var/log/cyberdeck.log 2>&1
+```
+
+### Через systemd (рекомендуется):
+
+См. раздел "С помощью systemd service" выше.
+
+## FAQ
+
+**Q: Conda не работает через sudo**
+A: Используйте полный путь к Python:
+```bash
+sudo /home/user/miniconda3/envs/cyberdeck/bin/python core/main.py
+```
+
+**Q: Ошибка "Permission denied" на /dev/spidev**
+A: Запустите от root: `sudo ./cyberdeck`
+
+**Q: Как проверить, что приложение работает от root?**
+A: В логах или статус-баре будет указано "Running as root"
+
+**Q: Безопасно ли запускать от root?**
+A: Да, если это dedicated устройство (Orange Pi cyberdeck). Не рекомендуется на shared системах.
+
+## Резюме команд
+
+```bash
+# Установка от root
+sudo bash install.sh
+
+# Запуск от root
+sudo ./cyberdeck
+
+# Или
+sudo su -
+conda activate cyberdeck
+./cyberdeck
+
+# Headless от root
+sudo ./cyberdeck --no-ui
+
+# Логи
+tail -f logs/cyberdeck_*.log
+```
+
+---
+
+**Ready to hack with full hardware access!** 🚀⚡

@@ -95,12 +95,18 @@ if [ ! -f "config/main.yaml" ]; then
     exit 1
 fi
 
-# Проверка прав для hardware access (предупреждение, не фатально)
-if ! groups | grep -q "gpio\|spi\|i2c"; then
-    echo -e "${YELLOW}[!]${NC} Your user is not in gpio/spi/i2c groups"
-    echo -e "${YELLOW}[!]${NC} Hardware modules may not work properly"
-    echo -e "${YELLOW}[!]${NC} Run: ${BLUE}sudo usermod -a -G gpio,spi,i2c \$USER${NC}"
-    echo -e "${YELLOW}[!]${NC} Then logout and login again\n"
+# Проверка прав для hardware access
+if [ "$EUID" -eq 0 ]; then
+    echo -e "${GREEN}[✓]${NC} Running as root - Full hardware access enabled"
+else
+    if ! groups | grep -q "gpio\|spi\|i2c"; then
+        echo -e "${YELLOW}[!]${NC} Your user is not in gpio/spi/i2c groups"
+        echo -e "${YELLOW}[!]${NC} Hardware modules may not work properly"
+        echo -e "${YELLOW}[!]${NC} Solutions:"
+        echo -e "${YELLOW}[!]${NC}   1. Run as root: ${BLUE}sudo ./cyberdeck${NC}"
+        echo -e "${YELLOW}[!]${NC}   2. Add to groups: ${BLUE}sudo usermod -a -G gpio,spi,i2c \$USER${NC}"
+        echo -e "${YELLOW}[!]${NC}      Then logout and login again\n"
+    fi
 fi
 
 # Запуск приложения
