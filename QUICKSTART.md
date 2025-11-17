@@ -6,11 +6,20 @@
 # 1. Run the installation script
 bash install.sh
 
-# 2. This will:
+# 2. If conda was just installed, reload your shell:
+source ~/.bashrc
+# or close and reopen your terminal
+
+# 3. The installation will:
 #    - Install Miniconda (if needed)
 #    - Create 'cyberdeck' conda environment
 #    - Install all Python dependencies
 #    - Set up directory structure
+
+# 4. If installation failed at "conda: command not found":
+#    Reload shell and run install.sh again:
+source ~/.bashrc
+bash install.sh
 ```
 
 ## Running the Application
