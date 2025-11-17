@@ -1,0 +1,106 @@
+# CyberDeck Interface - Key Bindings
+
+# Global keys
+global:
+  quit: "q"
+  help: "?"
+  command_mode: ":"
+  search: "/"
+
+  # Navigation (Vim-style)
+  menu_up: ["k", "up"]
+  menu_down: ["j", "down"]
+  menu_left: ["h", "left"]
+  menu_right: ["l", "right"]
+
+  select: "enter"
+  back: ["esc", "h"]
+  toggle: "space"
+
+  first_item: "g"
+  last_item: "G"
+  page_up: "ctrl u"
+  page_down: "ctrl d"
+
+  tab_next: "tab"
+  tab_prev: "shift tab"
+
+# Module-specific keys
+modules:
+  subghz:
+    record: "r"
+    play: "p"
+    stop: "s"
+    analyze: "a"
+    frequency_up: "up"
+    frequency_down: "down"
+    save: "w"
+
+  lora:
+    send_message: "s"
+    listen: "l"
+    nodes: "n"
+    position: "p"
+    channel: "c"
+
+  nfc:
+    read: "r"
+    emulate: "e"
+    save: "s"
+    attack: "a"
+    dump_load: "l"
+
+  wifi:
+    scenario_1: "1"
+    scenario_2: "2"
+    scenario_3: "3"
+    scenario_4: "4"
+    scenario_5: "5"
+    scenario_6: "6"
+    start_capture: "s"
+    stop_capture: "x"
+    export: "e"
+    view_handshakes: "h"
+
+  sdr:
+    record: "r"
+    stop: "s"
+    frequency_up: "up"
+    frequency_down: "down"
+    gain_up: "page up"
+    gain_down: "page down"
+    toggle_view: "tab"
+
+  badusb:
+    execute: "enter"
+    edit: "e"
+    new: "n"
+    delete: "d"
+    preview: "p"
+
+  gps:
+    waypoint: "w"
+    track_start: "s"
+    track_stop: "x"
+    export: "e"
+
+# Macros (F1-F12)
+macros:
+  F1: "quick_nfc_scan"
+  F2: "subghz_capture_433"
+  F3: "gps_mark_waypoint"
+  F4: "lora_ping_mesh"
+  F5: "launch_sdrangel"
+  F6: "launch_gqrx"
+  F7: null
+  F8: null
+  F9: null
+  F10: null
+  F11: null
+  F12: "screenshot"  # text dump of UI
+
+# Custom combinations
+custom:
+  "ctrl r": "reload_modules"
+  "ctrl l": "clear_screen"
+  "ctrl s": "save_session"

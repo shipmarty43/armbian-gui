@@ -1,0 +1,262 @@
+# CyberDeck Interface Configuration v2.0
+
+system:
+  device: "orangepi_zero2w"  # or "orangepi_3"
+  locale: "en_US.UTF-8"
+  timezone: "UTC"
+  log_level: "INFO"  # DEBUG, INFO, WARNING, ERROR
+  session_logging: true
+  log_path: "logs/"
+  log_rotation: 10  # MB
+
+hardware:
+  battery:
+    enabled: true
+    i2c_bus: 1
+    i2c_address: 0x36  # MAX17043
+    low_threshold: 20  # %
+    critical_threshold: 10
+    color_change: true
+    poll_interval: 5  # seconds
+
+  thermal:
+    monitoring: true
+    zones:
+      - "cpu-thermal"
+      - "gpu-thermal"
+    warning_threshold: 70  # °C
+    critical_threshold: 85  # °C
+    throttle_at_critical: true
+    poll_interval: 2  # seconds
+
+  gps:
+    enabled: false
+    device: "/dev/ttyS1"
+    baudrate: 9600
+    protocol: "nmea"  # nmea, ublox
+    poll_interval: 1  # seconds
+
+  nfc:
+    enabled: true
+    interface: "pn532_i2c"  # or "pn532_spi", "pn532_uart"
+    i2c_bus: 0
+    i2c_address: 0x24
+    reset_pin: null  # GPIO pin for reset (optional)
+
+  subghz:
+    enabled: true
+    spi_bus: 0
+    spi_device: 1
+    cs_pin: 24
+    gdo0_pin: 25
+    gdo2_pin: null
+    default_freq: 433.92  # MHz
+    freq_range: [300, 928]  # MHz
+    modulation: "ASK_OOK"  # ASK_OOK, FSK, GFSK, MSK
+    tx_power: 10  # dBm (-30 to +10)
+
+  lora:
+    enabled: false
+    spi_bus: 1
+    spi_device: 0
+    cs_pin: 8
+    reset_pin: 25
+    dio0_pin: 7
+    dio1_pin: null
+    frequency: 868.0  # EU: 868, US: 915, AS: 923
+    spreading_factor: 7  # 7-12
+    bandwidth: 125  # kHz: 125, 250, 500
+    coding_rate: 5  # 5-8
+    tx_power: 20  # dBm (2-20)
+    preamble_length: 8
+    sync_word: 0x12
+
+network:
+  wifi:
+    interface: "wlan0"
+    monitor_capable: true
+    chipset: "rtl8812au"  # for reference
+
+  wifi_secondary:
+    interface: "wlan1"
+    monitor_capable: true
+    chipset: "mt7612u"
+
+  lte:
+    enabled: false
+    interface: "wwan0"
+    device: "/dev/ttyUSB2"  # SIM7600G AT port
+    baudrate: 115200
+    monitor: true
+    apn: "internet"  # configure for your operator
+
+  ethernet:
+    interface: "eth0"
+    dhcp: true
+
+ui:
+  theme: "default"  # default, dark, light, custom
+  custom_theme_path: null
+  refresh_rate: 100  # ms
+  status_bar: true
+  show_tips: true
+  vim_mode: true
+  command_history_size: 100
+
+modules:
+  autoload:
+    - "subghz"
+    - "nfc"
+    - "wifi"
+    - "system"
+
+  paths:
+    - "modules"
+    - "/usr/local/lib/cyberdeck/modules"
+
+  priority_order: true  # Load by priority
+
+external_apps:
+  sdrangel:
+    path: "/usr/bin/sdrangel"
+    shortcut: "F5"
+    args: []
+
+  gqrx:
+    path: "/usr/bin/gqrx"
+    shortcut: "F6"
+    args: []
+
+  proxmark3:
+    path: "/usr/local/bin/pm3"
+    device: "/dev/ttyACM0"
+    args: []
+
+# WiFi module configuration
+wifi:
+  hcxtools_path: "/usr/bin/"
+  wordlists:
+    - "/usr/share/wordlists/rockyou.txt"
+    - "/home/user/wordlists/custom.txt"
+
+  default_scenario: "passive_monitor"
+
+  scenarios:
+    passive_monitor:
+      enabled: true
+      interface: "wlan0"
+
+    active_attack:
+      enabled: true
+      interface: "wlan0"
+      deauth_broadcast: false  # targeted only
+
+    dual_adapter:
+      enabled: true
+      monitor_interface: "wlan0"
+      attack_interface: "wlan1"
+
+    wardriving:
+      enabled: true
+      interface: "wlan0"
+      gps_required: true
+      auto_export: true
+
+    rogue_ap:
+      enabled: true
+      interface: "wlan0"
+      ssid: "Free_WiFi"
+      channel: 6
+
+    pmkid_attack:
+      enabled: true
+      interface: "wlan0"
+
+# Wardriving configuration
+wardriving:
+  enabled: true
+  gps_sync: true
+  scan_interval: 1  # seconds
+  min_signal: -90  # dBm
+  auto_export_wigle: true
+  export_path: "maps/"
+  map_autogen: true
+  map_template: "leaflet"  # leaflet, openlayers
+
+# Meshtastic configuration
+meshtastic:
+  enabled: false
+  device: "local"  # "local" for built-in SX1262, or "/dev/ttyUSB0"
+
+  channel:
+    name: "LongFast"
+    psk: null  # auto-generate, or hex string
+    uplink_enabled: false
+    downlink_enabled: false
+
+  lora_config:
+    region: "EU_868"  # EU_868, US, EU_433, AS_923, etc.
+    hop_limit: 3
+    tx_power: 20  # dBm
+
+  position_broadcast_interval: 900  # seconds (0 = disable)
+
+  node_info:
+    long_name: "CyberDeck-01"
+    short_name: "CD01"
+
+# SDR configuration
+sdr:
+  enabled: false
+  device_priority: ["hackrf", "rtlsdr"]
+
+  hackrf:
+    default_sample_rate: 2.0  # MSPS
+    default_freq: 433.92  # MHz
+    lna_gain: 32  # 0-40, step 8
+    vga_gain: 40  # 0-62, step 2
+    amp_enable: false  # 14dB boost
+
+  rtlsdr:
+    default_sample_rate: 2.4  # MSPS
+    default_freq: 433.92  # MHz
+    gain: 40  # 0-50
+    ppm: 0  # frequency correction
+
+  iq_record_path: "iq_samples/"
+  iq_format: "complex64"  # complex64, uint8
+
+# BadUSB configuration
+badusb:
+  enabled: false
+  usb_gadget_setup: true
+  keyboard_layout: "us"  # us, uk, de, ru, etc.
+  payload_directory: "badusb_payloads/"
+  default_delay: 50  # ms between keypresses
+  typing_speed: "normal"  # slow, normal, fast
+
+  usb_gadget:
+    vendor_id: "0x1d6b"
+    product_id: "0x0104"
+    manufacturer: "CyberDeck"
+    product: "BadUSB HID"
+    serial: "cyberdeck001"
+
+# Bluetooth configuration
+bluetooth:
+  enabled: false
+  adapter: "hci0"
+  scan_timeout: 10  # seconds
+  ble_enabled: true
+  classic_enabled: true
+
+# RFID configuration (Proxmark3)
+rfid:
+  enabled: false
+  proxmark3_device: "/dev/ttyACM0"
+  proxmark3_path: "/usr/local/bin/pm3"
+
+# Macros configuration
+macros:
+  enabled: true
+  directory: "scripts/"

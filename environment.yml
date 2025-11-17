@@ -1,0 +1,31 @@
+name: cyberdeck
+channels:
+  - conda-forge
+  - defaults
+dependencies:
+  # Python
+  - python=3.10
+
+  # Core libraries
+  - pip
+  - numpy>=1.21.0
+  - pyyaml>=6.0
+
+  # System monitoring
+  - psutil>=5.9.0
+
+  # Testing
+  - pytest>=7.0
+  - pytest-cov
+
+  # Through pip (not available in conda)
+  - pip:
+    # UI
+    - urwid>=2.1.2
+
+    # Hardware interfaces
+    - spidev>=3.5
+    - smbus2>=0.4.0
+
+    # Additional utilities
+    - python-dateutil>=2.8.0
