@@ -53,8 +53,8 @@ A modular, terminal-based interface for wireless protocol research, NFC/RFID ana
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/cyberdeck-interface.git
-cd cyberdeck-interface
+git clone https://github.com/shipmarty43/armbian-gui.git
+cd armbian-gui
 
 # Run installation script
 bash install.sh
@@ -367,7 +367,7 @@ MIT License (see LICENSE file)
 
 ## 🛟 Support
 
-- **Issues**: https://github.com/yourusername/cyberdeck-interface/issues
+- **Issues**: https://github.com/shipmarty43/armbian-gui/issues
 - **Documentation**: https://cyberdeck-docs.example.com
 - **Community**: Discord/Telegram (links TBD)
 

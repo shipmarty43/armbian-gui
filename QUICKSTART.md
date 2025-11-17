@@ -142,7 +142,7 @@ This is a **demo implementation**. To integrate real hardware:
 
 - **Documentation**: See `docs/` directory
 - **Module API**: `docs/MODULE_API.md`
-- **Issues**: https://github.com/yourusername/cyberdeck-interface/issues
+- **Issues**: https://github.com/shipmarty43/armbian-gui/issues
 
 ## Legal Notice
 
