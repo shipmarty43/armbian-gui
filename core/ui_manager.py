@@ -399,9 +399,9 @@ class UIManager:
         )
 
         pile = urwid.Pile([
-            padding,
-            urwid.Divider(),
-            button_padding
+            ('weight', 1, padding),
+            ('pack', urwid.Divider()),
+            ('pack', button_padding)
         ])
 
         box = urwid.LineBox(pile, title=title)

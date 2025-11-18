@@ -12,8 +12,8 @@ system:
 hardware:
   battery:
     enabled: true
-    i2c_bus: 1
-    i2c_address: 0x36  # MAX17043
+    i2c_bus: 3  # I2C bus 3 for Orange Pi Zero 2W UPS HAT
+    i2c_address: 0x10  # UPS module I2C address
     low_threshold: 20  # %
     critical_threshold: 10
     color_change: true
@@ -67,20 +67,20 @@ hardware:
     pa_level: 3  # 0: -18dBm, 1: -12dBm, 2: -6dBm, 3: 0dBm (or +20dBm for PA module)
 
   lora:
-    enabled: false
-    spi_bus: 1
+    enabled: true  # ✓ Enabled - Waveshare SX1262 LoRa HAT
+    spi_bus: 0
     spi_device: 0
     cs_pin: 8
-    reset_pin: 25
-    dio0_pin: 7
-    dio1_pin: null
+    reset_pin: 18  # RST pin for Waveshare HAT
+    busy_pin: 24  # BUSY pin for SX1262
+    dio1_pin: 23  # DIO1 pin for SX1262
     frequency: 868.0  # EU: 868, US: 915, AS: 923
-    spreading_factor: 7  # 7-12
+    spreading_factor: 11  # 7-12 (SF11 for Meshtastic compatibility)
     bandwidth: 125  # kHz: 125, 250, 500
     coding_rate: 5  # 5-8
     tx_power: 20  # dBm (2-20)
     preamble_length: 8
-    sync_word: 0x12
+    sync_word: 0x12  # Meshtastic sync word
 
 network:
   wifi:
@@ -94,7 +94,7 @@ network:
     chipset: "mt7612u"
 
   lte:
-    enabled: false
+    enabled: true  # ✓ Enabled - LTE modem support
     interface: "wwan0"
     device: "/dev/ttyUSB2"  # SIM7600G AT port
     baudrate: 115200
@@ -119,11 +119,13 @@ modules:
     - "subghz"
     - "nrf24"
     - "nfc"
+    - "lora"  # ✓ Added - LoRa mesh networking
     - "wifi"
     - "gps"
     - "badusb"
     - "bluetooth"
     - "sdr"
+    - "rfid"  # ✓ Added - Proxmark3 RFID
     - "system"
 
   paths:
@@ -201,14 +203,14 @@ wardriving:
 
 # Meshtastic configuration
 meshtastic:
-  enabled: false
+  enabled: true  # ✓ Enabled - Meshtastic mesh networking on SX1262
   device: "local"  # "local" for built-in SX1262, or "/dev/ttyUSB0"
 
   channel:
     name: "LongFast"
     psk: null  # auto-generate, or hex string
-    uplink_enabled: false
-    downlink_enabled: false
+    uplink_enabled: true  # ✓ Enabled - MQTT uplink for mesh data
+    downlink_enabled: true  # ✓ Enabled - MQTT downlink for mesh data
 
   lora_config:
     region: "EU_868"  # EU_868, US, EU_433, AS_923, etc.
@@ -268,7 +270,7 @@ bluetooth:
 
 # RFID configuration (Proxmark3)
 rfid:
-  enabled: false
+  enabled: true  # ✓ Enabled - Proxmark3 RFID support
   proxmark3_device: "/dev/ttyACM0"
   proxmark3_path: "/usr/local/bin/pm3"
 
