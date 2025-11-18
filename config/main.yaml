@@ -209,8 +209,8 @@ meshtastic:
   channel:
     name: "LongFast"
     psk: null  # auto-generate, or hex string
-    uplink_enabled: false
-    downlink_enabled: false
+    uplink_enabled: true  # ✓ Enabled - MQTT uplink for mesh data
+    downlink_enabled: true  # ✓ Enabled - MQTT downlink for mesh data
 
   lora_config:
     region: "EU_868"  # EU_868, US, EU_433, AS_923, etc.
