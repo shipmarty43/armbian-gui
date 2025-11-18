@@ -389,7 +389,7 @@ MIT License (see LICENSE file)
 
 ## 🗺️ Roadmap
 
-### v3.0 (Current)
+### v3.0 (Released - Current Stable)
 - ✅ Core architecture with event bus
 - ✅ Modular plugin system
 - ✅ Full mouse and touchscreen support
@@ -398,17 +398,26 @@ MIT License (see LICENSE file)
 - ✅ Python 3.11+ with venv (no conda required)
 - ✅ Hardware config: nRF24L01+ and CC1101 on shared SPI
 
-### v3.1 (Planned)
-- 🔲 Full hardware integration (CC1101, PN532)
-- 🔲 LoRa/Meshtastic implementation
-- 🔲 GPS wardriving with real hardware
-- 🔲 SDR support (HackRF/RTL-SDR)
+### v3.1 (Released - Hardware Integration Complete)
+- ✅ Full CC1101 hardware integration (Sub-GHz TX/RX)
+- ✅ PN532 NFC/RFID driver (I2C/SPI)
+- ✅ LoRa mesh networking (Meshtastic + Reticulum)
+- ✅ SX1262 LoRa driver for Waveshare HAT
+- ✅ GPS wardriving with NMEA parser
+- ✅ SDR support (HackRF One + RTL-SDR via SoapySDR)
 
-### v4.0 (Future)
-- 🔲 Web UI (remote access)
-- 🔲 Bluetooth terminal control
-- 🔲 CAN Bus support
-- 🔲 ML signal classification
+### v4.0 (Released - Advanced Features)
+- ✅ Web UI (Flask-based remote access)
+- ✅ Real-time API for all modules
+- 🔲 Bluetooth terminal control (framework ready)
+- 🔲 CAN Bus support (framework ready)
+- 🔲 ML signal classification (framework ready)
+
+### v4.1 (Planned)
+- 🔲 Protocol decoders (Princeton, Came, Nice, KeeLoq)
+- 🔲 NDEF record parsing
+- 🔲 Audio demodulation (FM/AM)
+- 🔲 LTE/5G modem integration
 
 ---
 
