@@ -61,7 +61,8 @@ class SubGHzModule(BaseModule):
         if CC1101_AVAILABLE:
             try:
                 # Get config from module
-                config = self.get_config().get('hardware', {}).get('subghz', {})
+                main_config = self.load_config("config/main.yaml")
+                config = main_config.get('hardware', {}).get('subghz', {})
                 if config.get('enabled', False):
                     self.spi_bus = config.get('spi_bus', 1)
                     self.spi_device = config.get('spi_device', 1)

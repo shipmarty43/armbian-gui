@@ -69,14 +69,15 @@ class LoRaModule(BaseModule):
     def on_load(self):
         """Инициализация модуля"""
         self.log_info("LoRa Mesh module loading...")
-        
+
         # Load config
-        config = self.get_config().get('lora', {})
-        
+        main_config = self.load_config("config/main.yaml")
+        config = main_config.get('hardware', {}).get('lora', {})
+
         if not config.get('enabled', False):
             self.log_info("LoRa disabled in config")
             return
-            
+
         # Try to initialize SX1262 hardware
         if SX1262_AVAILABLE:
             try:
