@@ -1,6 +1,6 @@
-# CyberDeck Interface v2.0
+# CyberDeck Interface v3.0
 
-**Mobile Security Research Platform for Orange Pi**
+**Mobile Security Research Platform for Orange Pi / Raspberry Pi**
 
 A modular, terminal-based interface for wireless protocol research, NFC/RFID analysis, SDR experimentation, and WiFi security testing.
 
@@ -53,15 +53,38 @@ A modular, terminal-based interface for wireless protocol research, NFC/RFID ana
 
 ```bash
 # Clone the repository
-git clone https://github.com/yourusername/cyberdeck-interface.git
-cd cyberdeck-interface
+git clone https://github.com/shipmarty43/armbian-gui.git
+cd armbian-gui
 
 # Run installation script
 bash install.sh
 
 # Launch the application
 ./cyberdeck
+
+# For hardware access (GPIO/SPI/I2C), run as root:
+sudo ./cyberdeck
 ```
+
+### Running with Hardware Access
+
+For full access to GPIO, SPI, I2C, and other hardware interfaces:
+
+```bash
+# Option 1: Run with sudo (recommended)
+sudo ./cyberdeck
+
+# Option 2: Install as root
+sudo bash install.sh
+sudo ./cyberdeck
+
+# Option 3: Add user to hardware groups
+sudo usermod -a -G gpio,spi,i2c,dialout $USER
+# Then logout and login again
+./cyberdeck
+```
+
+See [docs/ROOT_USAGE.md](docs/ROOT_USAGE.md) for detailed information.
 
 ### Manual Installation
 
@@ -344,7 +367,7 @@ MIT License (see LICENSE file)
 
 ## 🛟 Support
 
-- **Issues**: https://github.com/yourusername/cyberdeck-interface/issues
+- **Issues**: https://github.com/shipmarty43/armbian-gui/issues
 - **Documentation**: https://cyberdeck-docs.example.com
 - **Community**: Discord/Telegram (links TBD)
 

@@ -24,16 +24,37 @@ bash install.sh
 
 ## Running the Application
 
-### Option 1: Using the launcher
+### Option 1: Using the launcher (with hardware access)
 ```bash
+# For full GPIO/SPI/I2C access (recommended for Orange Pi/Raspberry Pi)
+sudo ./cyberdeck
+```
+
+### Option 2: Running as regular user (UI testing only)
+```bash
+# Without hardware access - for UI testing
 ./cyberdeck
 ```
 
-### Option 2: Manual activation
+### Option 3: Manual activation
 ```bash
 conda activate cyberdeck
 python core/main.py
+
+# Or with sudo for hardware:
+sudo /home/$USER/miniconda3/envs/cyberdeck/bin/python core/main.py
 ```
+
+### Why sudo?
+
+CyberDeck needs root access for:
+- 🔌 GPIO pins (nRF24, CC1101 chip select)
+- 📡 SPI devices (/dev/spidev*)
+- 🔧 I2C devices (/dev/i2c*)
+- 🖥️ USB Gadget (BadUSB module)
+- 📻 Raw WiFi sockets (monitor mode)
+
+**Alternative:** Add user to hardware groups (see [docs/ROOT_USAGE.md](docs/ROOT_USAGE.md))
 
 ## First Steps
 
@@ -121,7 +142,7 @@ This is a **demo implementation**. To integrate real hardware:
 
 - **Documentation**: See `docs/` directory
 - **Module API**: `docs/MODULE_API.md`
-- **Issues**: https://github.com/yourusername/cyberdeck-interface/issues
+- **Issues**: https://github.com/shipmarty43/armbian-gui/issues
 
 ## Legal Notice
 
