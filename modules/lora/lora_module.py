@@ -17,11 +17,10 @@ except ImportError:
     SX1262_AVAILABLE = False
 
 try:
-    import meshtastic
-    from meshtastic.serial_interface import SerialInterface
-    MESHTASTIC_AVAILABLE = True
+    from .meshtastic_protocol import MeshtasticProtocol, get_meshtastic_lora_config
+    MESHTASTIC_PROTOCOL_AVAILABLE = True
 except ImportError:
-    MESHTASTIC_AVAILABLE = False
+    MESHTASTIC_PROTOCOL_AVAILABLE = False
 
 try:
     import RNS
@@ -50,15 +49,19 @@ class LoRaModule(BaseModule):
         )
         
         self.sx1262 = None
-        self.meshtastic_interface = None
+        self.meshtastic = None  # Meshtastic protocol handler
         self.reticulum = None
-        
+
         self.mode = "direct"  # direct, meshtastic, reticulum
         self.hardware_enabled = False
-        
+
         # Message storage
         self.messages = []
         self.nodes = []
+
+        # Mesh monitoring
+        self.mesh_monitoring = False
+        self.mesh_thread = None
         
         self.logs_dir = "lora_logs"
         os.makedirs(self.logs_dir, exist_ok=True)
@@ -94,22 +97,29 @@ class LoRaModule(BaseModule):
                 if self.sx1262.initialize():
                     self.hardware_enabled = True
                     self.log_info("SX1262 LoRa hardware initialized")
+
+                    # Initialize Meshtastic protocol on this hardware
+                    if MESHTASTIC_PROTOCOL_AVAILABLE:
+                        try:
+                            node_id = config.get('node_id', None)
+                            self.meshtastic = MeshtasticProtocol(node_id=node_id)
+
+                            # Configure LoRa for Meshtastic
+                            mesh_config = get_meshtastic_lora_config()
+                            self.sx1262.set_frequency(mesh_config['frequency'])
+                            self.sx1262.spreading_factor = mesh_config['spreading_factor']
+                            self.sx1262.bandwidth = mesh_config['bandwidth']
+                            self.sx1262.tx_power = mesh_config['tx_power']
+
+                            self.log_info(f"Meshtastic protocol initialized on hardware")
+                            self.log_info(f"Node ID: 0x{self.meshtastic.node_id:08X}")
+                        except Exception as e:
+                            self.log_error(f"Failed to initialize Meshtastic protocol: {e}")
                 else:
                     self.log_warning("SX1262 initialization failed")
-                    
+
             except Exception as e:
                 self.log_error(f"Failed to initialize SX1262: {e}")
-        
-        # Try to initialize Meshtastic
-        if MESHTASTIC_AVAILABLE:
-            try:
-                # Meshtastic via serial (if device connected)
-                port = config.get('meshtastic_port', None)
-                if port:
-                    self.meshtastic_interface = SerialInterface(port)
-                    self.log_info(f"Meshtastic initialized on {port}")
-            except Exception as e:
-                self.log_warning(f"Meshtastic not available: {e}")
         
         # Try to initialize Reticulum
         if RETICULUM_AVAILABLE:
@@ -123,17 +133,16 @@ class LoRaModule(BaseModule):
     
     def on_unload(self):
         """Освобождение ресурсов"""
+        # Stop mesh monitoring
+        self.mesh_monitoring = False
+        if self.mesh_thread:
+            self.mesh_thread.join(timeout=2.0)
+
         if self.sx1262:
             try:
                 self.sx1262.close()
             except Exception as e:
                 self.log_error(f"Error closing SX1262: {e}")
-                
-        if self.meshtastic_interface:
-            try:
-                self.meshtastic_interface.close()
-            except:
-                pass
     
     def get_menu_items(self) -> List[Tuple[str, Callable]]:
         """Пункты меню модуля"""
@@ -187,13 +196,20 @@ class LoRaModule(BaseModule):
                     f"Frequency: {self.sx1262.frequency/1e6}MHz\n"
                     f"Power: {self.sx1262.tx_power}dBm"
                 )
-                
-            elif self.mode == "meshtastic" and self.meshtastic_interface:
-                # Meshtastic mesh
-                self.meshtastic_interface.sendText(message)
+
+            elif self.mode == "meshtastic" and self.meshtastic:
+                # Meshtastic mesh on hardware
+                packet = self.meshtastic.send_text(message)
+                encoded = self.meshtastic.encode_packet(packet)
+                self.sx1262.transmit(encoded)
+
                 self.show_message(
                     "Message Sent",
-                    f"Sent via Meshtastic mesh:\n{message}"
+                    f"Sent via Meshtastic mesh:\n{message}\n\n"
+                    f"From: 0x{self.meshtastic.node_id:08X}\n"
+                    f"To: Broadcast\n"
+                    f"Packet ID: 0x{packet.id:08X}\n"
+                    f"Hops: {packet.hop_limit}"
                 )
                 
             elif self.mode == "reticulum" and self.reticulum:
@@ -223,20 +239,20 @@ class LoRaModule(BaseModule):
             if self.mode == "direct":
                 # Direct LoRa receive
                 self.show_message("Receiving", "Listening for LoRa messages...\nTimeout: 10s")
-                
+
                 data = self.sx1262.receive(timeout=10.0)
-                
+
                 if data:
                     try:
                         message = data.decode('utf-8', errors='ignore')
                         rssi = self.sx1262.get_rssi()
-                        
+
                         self.messages.append({
                             'message': message,
                             'rssi': rssi,
                             'time': time.time()
                         })
-                        
+
                         self.show_message(
                             "Message Received",
                             f"Received:\n{message}\n\n"
@@ -246,29 +262,79 @@ class LoRaModule(BaseModule):
                         self.show_message("Received", f"Raw data: {data.hex()}")
                 else:
                     self.show_message("Receive", "No messages received")
-                    
-            elif self.mode == "meshtastic" and self.meshtastic_interface:
-                # Check Meshtastic messages
-                self.show_message(
-                    "Meshtastic Receive",
-                    "Checking Meshtastic mesh...\n"
-                    "(Implementation in progress)"
-                )
+
+            elif self.mode == "meshtastic" and self.meshtastic:
+                # Meshtastic mesh receive
+                self.show_message("Receiving", "Listening for Meshtastic packets...\nTimeout: 30s")
+
+                data = self.sx1262.receive(timeout=30.0)
+
+                if data:
+                    packet = self.meshtastic.decode_packet(data)
+
+                    if packet:
+                        # Process packet
+                        message_text = self.meshtastic.process_received_packet(packet)
+                        rssi = self.sx1262.get_rssi()
+
+                        result = f"Meshtastic Packet Received\n\n"
+                        result += f"From: 0x{packet.from_node:08X}\n"
+                        result += f"To: {'Broadcast' if packet.to == self.meshtastic.BROADCAST_ADDR else f'0x{packet.to:08X}'}\n"
+                        result += f"RSSI: {rssi}dBm\n"
+                        result += f"Hops: {packet.hop_limit}\n\n"
+
+                        if message_text:
+                            result += f"Message:\n{message_text}"
+
+                            self.messages.append({
+                                'message': message_text,
+                                'from': packet.from_node,
+                                'rssi': rssi,
+                                'time': time.time()
+                            })
+                        else:
+                            result += f"Type: Port {packet.port_num}"
+
+                        # Check if should rebroadcast
+                        if self.meshtastic.should_rebroadcast(packet):
+                            result += f"\n\n[Rebroadcasting...]"
+                            rebroadcast = self.meshtastic.rebroadcast_packet(packet)
+                            encoded = self.meshtastic.encode_packet(rebroadcast)
+
+                            # Random delay for mesh protocol
+                            delay = random.randint(*self.meshtastic.REBROADCAST_DELAY_MS) / 1000.0
+                            time.sleep(delay)
+                            self.sx1262.transmit(encoded)
+
+                        self.show_message("Meshtastic Received", result)
+                    else:
+                        self.show_message("Receive", "Invalid Meshtastic packet")
+                else:
+                    self.show_message("Receive", "No packets received")
                 
         except Exception as e:
             self.show_error(f"Receive error: {e}")
     
     def view_nodes(self):
         """Просмотр mesh узлов"""
-        if self.mode == "meshtastic" and self.meshtastic_interface:
+        if self.mode == "meshtastic" and self.meshtastic:
             try:
                 # Get Meshtastic nodes
-                nodes_text = "Meshtastic Mesh Nodes:\n\n"
-                
-                # This would list nodes from Meshtastic
-                nodes_text += "(Node discovery in progress)\n"
-                nodes_text += "Check Meshtastic app for full node list."
-                
+                nodes = self.meshtastic.get_mesh_nodes()
+
+                nodes_text = f"Meshtastic Mesh Nodes: {len(nodes)}\n\n"
+                nodes_text += f"My Node ID: 0x{self.meshtastic.node_id:08X}\n\n"
+
+                if nodes:
+                    for node in nodes:
+                        nodes_text += f"Node: 0x{node['id']:08X}\n"
+                        nodes_text += f"  RSSI: {node['rssi']}dBm\n"
+                        nodes_text += f"  SNR: {node['snr']:.1f}dB\n"
+                        nodes_text += f"  Last seen: {int(time.time() - node['last_seen'])}s ago\n\n"
+                else:
+                    nodes_text += "No nodes discovered yet.\n"
+                    nodes_text += "Send messages to discover nodes."
+
                 self.show_message("Mesh Nodes", nodes_text)
             except Exception as e:
                 self.show_error(f"Error getting nodes: {e}")
@@ -285,10 +351,10 @@ class LoRaModule(BaseModule):
         modes = []
         
         modes.append("Direct LoRa (Point-to-Point)")
-        
-        if MESHTASTIC_AVAILABLE:
+
+        if MESHTASTIC_PROTOCOL_AVAILABLE and self.meshtastic:
             modes.append("Meshtastic Mesh")
-            
+
         if RETICULUM_AVAILABLE:
             modes.append("Reticulum Network")
         
@@ -296,43 +362,55 @@ class LoRaModule(BaseModule):
         
         if idx == 0:
             self.mode = "direct"
-            self.show_message("Mode", "Mode: Direct LoRa")
-        elif idx == 1 and MESHTASTIC_AVAILABLE:
+            # Restore direct LoRa settings
+            if self.sx1262:
+                self.sx1262.set_frequency(433920000)  # 433.92 MHz
+                self.sx1262.spreading_factor = 7
+                self.sx1262.tx_power = 22
+            self.show_message("Mode", "Mode: Direct LoRa\n\nLoRa configured for direct TX/RX")
+        elif idx == 1 and self.meshtastic:
             self.mode = "meshtastic"
-            self.show_message("Mode", "Mode: Meshtastic Mesh")
+            # Configure for Meshtastic
+            if self.sx1262:
+                mesh_config = get_meshtastic_lora_config()
+                self.sx1262.set_frequency(mesh_config['frequency'])
+                self.sx1262.spreading_factor = mesh_config['spreading_factor']
+            self.show_message("Mode", f"Mode: Meshtastic Mesh\n\nNode: 0x{self.meshtastic.node_id:08X}\n\nLoRa configured for mesh networking")
         elif idx == 2 and RETICULUM_AVAILABLE:
             self.mode = "reticulum"
             self.show_message("Mode", "Mode: Reticulum Network")
     
     def meshtastic_chat(self):
         """Meshtastic chat interface"""
-        if not MESHTASTIC_AVAILABLE:
+        if not self.meshtastic:
             self.show_message(
                 "Meshtastic",
-                "Meshtastic not installed.\n\n"
-                "Install: pip install meshtastic"
+                "Meshtastic protocol not initialized.\n\n"
+                "Check hardware configuration."
             )
             return
-            
-        if not self.meshtastic_interface:
+
+        # Send node info broadcast
+        try:
+            node_packet = self.meshtastic.send_node_info()
+            encoded = self.meshtastic.encode_packet(node_packet)
+            self.sx1262.transmit(encoded)
+
             self.show_message(
-                "Meshtastic",
-                "Meshtastic device not connected.\n\n"
-                "Connect Meshtastic device via USB\n"
-                "or configure in config/main.yaml"
+                "Meshtastic Chat",
+                f"Meshtastic Mesh Ready\n\n"
+                f"Node ID: 0x{self.meshtastic.node_id:08X}\n"
+                f"Mode: {self.mode.upper()}\n\n"
+                f"Features:\n"
+                f"- Long-range mesh messaging\n"
+                f"- Automatic packet routing\n"
+                f"- Hop limit: 3\n"
+                f"- Managed flooding algorithm\n\n"
+                f"Node info broadcast sent!\n"
+                f"Listen for other nodes..."
             )
-            return
-            
-        self.show_message(
-            "Meshtastic Chat",
-            "Meshtastic Mesh Chat\n\n"
-            "Features:\n"
-            "- Long-range mesh messaging\n"
-            "- Automatic routing\n"
-            "- Encrypted channels\n"
-            "- Position sharing\n\n"
-            "Use Meshtastic app for full features."
-        )
+        except Exception as e:
+            self.show_error(f"Error: {e}")
     
     def reticulum_network(self):
         """Reticulum network interface"""
