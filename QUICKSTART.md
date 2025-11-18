@@ -7,7 +7,7 @@
 bash install.sh
 
 # 2. The installation will:
-#    - Check for Python 3.8+
+#    - Check for Python 3.11+
 #    - Install pip and venv if needed
 #    - Create virtual environment in ./venv
 #    - Install all Python dependencies
@@ -15,7 +15,7 @@ bash install.sh
 
 # 3. If Python is missing, install it first:
 sudo apt update
-sudo apt install -y python3 python3-pip python3-venv
+sudo apt install -y python3.11 python3.11-venv python3-pip
 bash install.sh
 ```
 
