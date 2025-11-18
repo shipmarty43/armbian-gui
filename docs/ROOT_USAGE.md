@@ -23,8 +23,8 @@ cd /home/user/armbian-gui
 # Запустите установку
 bash install.sh
 
-# Это установит Miniconda в /root/miniconda3
-# и создаст окружение cyberdeck для root
+# Это создаст виртуальное окружение в ./venv
+# и установит все зависимости
 ```
 
 ### Вариант 2: Использование существующей установки
@@ -36,11 +36,11 @@ bash install.sh
 sudo ./cyberdeck
 ```
 
-**Внимание:** При использовании `sudo`, conda окружение может не активироваться автоматически. В этом случае:
+**Внимание:** При использовании `sudo`, виртуальное окружение может не активироваться автоматически. В этом случае:
 
 ```bash
-# Запустите напрямую с Python от root
-sudo /home/user/miniconda3/envs/cyberdeck/bin/python core/main.py
+# Запустите напрямую с Python из venv
+sudo ./venv/bin/python core/main.py
 ```
 
 ## Способы запуска
@@ -54,10 +54,10 @@ sudo ./cyberdeck
 ### 2. Прямой запуск Python
 
 ```bash
-# Активируйте conda окружение root
+# Активируйте виртуальное окружение от root
 sudo su -
-conda activate cyberdeck
 cd /home/user/armbian-gui
+source venv/bin/activate
 python core/main.py
 ```
 
@@ -80,8 +80,8 @@ After=network.target
 Type=simple
 User=root
 WorkingDirectory=/home/user/armbian-gui
-Environment="PATH=/root/miniconda3/envs/cyberdeck/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
-ExecStart=/root/miniconda3/envs/cyberdeck/bin/python /home/user/armbian-gui/core/main.py --no-ui
+Environment="PATH=/home/user/armbian-gui/venv/bin:/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin"
+ExecStart=/home/user/armbian-gui/venv/bin/python /home/user/armbian-gui/core/main.py --no-ui
 Restart=on-failure
 RestartSec=10
 
@@ -193,8 +193,8 @@ tail -f logs/cyberdeck_*.log
 # Запуск без UI
 sudo ./cyberdeck --no-ui
 
-# Или через Python
-sudo /root/miniconda3/envs/cyberdeck/bin/python core/main.py --no-ui
+# Или через Python из venv
+sudo ./venv/bin/python core/main.py --no-ui
 ```
 
 ## Автозапуск при загрузке
@@ -215,10 +215,10 @@ sudo crontab -e
 
 ## FAQ
 
-**Q: Conda не работает через sudo**
+**Q: Виртуальное окружение не работает через sudo**
 A: Используйте полный путь к Python:
 ```bash
-sudo /home/user/miniconda3/envs/cyberdeck/bin/python core/main.py
+sudo ./venv/bin/python core/main.py
 ```
 
 **Q: Ошибка "Permission denied" на /dev/spidev**
@@ -241,7 +241,7 @@ sudo ./cyberdeck
 
 # Или
 sudo su -
-conda activate cyberdeck
+source venv/bin/activate
 ./cyberdeck
 
 # Headless от root

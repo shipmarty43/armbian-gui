@@ -42,8 +42,8 @@ A modular, terminal-based interface for wireless protocol research, NFC/RFID ana
 
 ### Software
 - **OS**: Armbian (Ubuntu 22.04 base)
-- **Python**: 3.10+
-- **Conda**: For environment management
+- **Python**: 3.8+
+- **pip** and **venv**: For environment management
 
 ---
 
@@ -89,15 +89,15 @@ See [docs/ROOT_USAGE.md](docs/ROOT_USAGE.md) for detailed information.
 ### Manual Installation
 
 ```bash
-# Install Miniconda (if not installed)
-wget https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh
-bash Miniconda3-latest-Linux-aarch64.sh
+# Install Python and dependencies (if not installed)
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv
 
-# Create conda environment
-conda env create -f environment.yml
+# Create virtual environment
+python3 -m venv venv
 
 # Activate environment
-conda activate cyberdeck
+source venv/bin/activate
 
 # Install Python dependencies
 pip install -r requirements.txt

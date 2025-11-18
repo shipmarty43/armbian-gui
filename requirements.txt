@@ -1,6 +1,7 @@
 # CyberDeck Interface Python Dependencies
 
 # Core
+numpy>=1.21.0
 pyyaml>=6.0
 urwid>=2.1.2
 psutil>=5.9.0
@@ -27,3 +28,7 @@ smbus2>=0.4.0
 
 # Additional utilities
 python-dateutil>=2.8.0
+
+# Testing (optional)
+pytest>=7.0
+pytest-cov
