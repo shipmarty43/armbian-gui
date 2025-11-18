@@ -19,10 +19,11 @@ A modular, terminal-based interface for wireless protocol research, NFC/RFID ana
 
 ### Architecture
 - **Modular Plugin System**: Dynamic module loading with priority-based initialization
-- **Vim-Style Interface**: curses-based TUI with vim navigation
+- **Vim-Style Interface**: curses-based TUI with vim navigation and full mouse/touchscreen support
 - **Event Bus**: Pub/sub system for inter-module communication
 - **System Monitoring**: Battery (MAX17043), temperature, WiFi/LTE signal tracking
 - **Session Logging**: Complete audit trail of all operations
+- **Lightweight**: Pure Python with venv, no heavy dependencies
 
 ---
 
@@ -195,7 +196,7 @@ cyberdeck-interface/
 │
 ├── install.sh            # Installation script
 ├── requirements.txt      # Python dependencies
-├── environment.yml       # Conda environment
+├── cyberdeck             # Launcher script
 └── README.md             # This file
 ```
 
@@ -316,7 +317,10 @@ Features:
 Run the test suite:
 
 ```bash
-conda activate cyberdeck
+# Activate virtual environment
+source venv/bin/activate
+
+# Run tests
 pytest tests/ -v --cov=core --cov=modules
 ```
 
@@ -368,8 +372,9 @@ MIT License (see LICENSE file)
 ## 🛟 Support
 
 - **Issues**: https://github.com/shipmarty43/armbian-gui/issues
-- **Documentation**: https://cyberdeck-docs.example.com
-- **Community**: Discord/Telegram (links TBD)
+- **Documentation**: See `docs/` directory for detailed guides
+- **Quick Start**: `QUICKSTART.md`
+- **Root Usage**: `docs/ROOT_USAGE.md`
 
 ---
 
@@ -384,19 +389,22 @@ MIT License (see LICENSE file)
 
 ## 🗺️ Roadmap
 
-### v1.0 (Current)
-- ✅ Core architecture
-- ✅ Module system
-- ✅ Sub-GHz, NFC, WiFi modules (demo)
-- ✅ System monitors
+### v3.0 (Current)
+- ✅ Core architecture with event bus
+- ✅ Modular plugin system
+- ✅ Full mouse and touchscreen support
+- ✅ System monitors (battery, thermal, network)
+- ✅ Root user support for hardware access
+- ✅ Python 3.11+ with venv (no conda required)
+- ✅ Hardware config: nRF24L01+ and CC1101 on shared SPI
 
-### v1.1 (Planned)
+### v3.1 (Planned)
 - 🔲 Full hardware integration (CC1101, PN532)
 - 🔲 LoRa/Meshtastic implementation
-- 🔲 GPS wardriving
+- 🔲 GPS wardriving with real hardware
 - 🔲 SDR support (HackRF/RTL-SDR)
 
-### v2.0 (Future)
+### v4.0 (Future)
 - 🔲 Web UI (remote access)
 - 🔲 Bluetooth terminal control
 - 🔲 CAN Bus support
@@ -406,4 +414,4 @@ MIT License (see LICENSE file)
 
 **Built with ❤️ for the security research community**
 
-*Last updated: 2025-11-17*
+*Last updated: 2025-11-18 | Version 3.0*
