@@ -19,10 +19,11 @@ A modular, terminal-based interface for wireless protocol research, NFC/RFID ana
 
 ### Architecture
 - **Modular Plugin System**: Dynamic module loading with priority-based initialization
-- **Vim-Style Interface**: curses-based TUI with vim navigation
+- **Vim-Style Interface**: curses-based TUI with vim navigation and full mouse/touchscreen support
 - **Event Bus**: Pub/sub system for inter-module communication
 - **System Monitoring**: Battery (MAX17043), temperature, WiFi/LTE signal tracking
 - **Session Logging**: Complete audit trail of all operations
+- **Lightweight**: Pure Python with venv, no heavy dependencies
 
 ---
 
@@ -42,7 +43,7 @@ A modular, terminal-based interface for wireless protocol research, NFC/RFID ana
 
 ### Software
 - **OS**: Armbian (Ubuntu 22.04 base)
-- **Python**: 3.8+
+- **Python**: 3.11+
 - **pip** and **venv**: For environment management
 
 ---
@@ -89,12 +90,12 @@ See [docs/ROOT_USAGE.md](docs/ROOT_USAGE.md) for detailed information.
 ### Manual Installation
 
 ```bash
-# Install Python and dependencies (if not installed)
+# Install Python 3.11 and dependencies (if not installed)
 sudo apt update
-sudo apt install -y python3 python3-pip python3-venv
+sudo apt install -y python3.11 python3.11-venv python3-pip
 
 # Create virtual environment
-python3 -m venv venv
+python3.11 -m venv venv
 
 # Activate environment
 source venv/bin/activate
@@ -195,7 +196,7 @@ cyberdeck-interface/
 │
 ├── install.sh            # Installation script
 ├── requirements.txt      # Python dependencies
-├── environment.yml       # Conda environment
+├── cyberdeck             # Launcher script
 └── README.md             # This file
 ```
 
@@ -316,7 +317,10 @@ Features:
 Run the test suite:
 
 ```bash
-conda activate cyberdeck
+# Activate virtual environment
+source venv/bin/activate
+
+# Run tests
 pytest tests/ -v --cov=core --cov=modules
 ```
 
@@ -368,8 +372,9 @@ MIT License (see LICENSE file)
 ## 🛟 Support
 
 - **Issues**: https://github.com/shipmarty43/armbian-gui/issues
-- **Documentation**: https://cyberdeck-docs.example.com
-- **Community**: Discord/Telegram (links TBD)
+- **Documentation**: See `docs/` directory for detailed guides
+- **Quick Start**: `QUICKSTART.md`
+- **Root Usage**: `docs/ROOT_USAGE.md`
 
 ---
 
@@ -384,26 +389,38 @@ MIT License (see LICENSE file)
 
 ## 🗺️ Roadmap
 
-### v1.0 (Current)
-- ✅ Core architecture
-- ✅ Module system
-- ✅ Sub-GHz, NFC, WiFi modules (demo)
-- ✅ System monitors
+### v3.0 (Released - Current Stable)
+- ✅ Core architecture with event bus
+- ✅ Modular plugin system
+- ✅ Full mouse and touchscreen support
+- ✅ System monitors (battery, thermal, network)
+- ✅ Root user support for hardware access
+- ✅ Python 3.11+ with venv (no conda required)
+- ✅ Hardware config: nRF24L01+ and CC1101 on shared SPI
 
-### v1.1 (Planned)
-- 🔲 Full hardware integration (CC1101, PN532)
-- 🔲 LoRa/Meshtastic implementation
-- 🔲 GPS wardriving
-- 🔲 SDR support (HackRF/RTL-SDR)
+### v3.1 (Released - Hardware Integration Complete)
+- ✅ Full CC1101 hardware integration (Sub-GHz TX/RX)
+- ✅ PN532 NFC/RFID driver (I2C/SPI)
+- ✅ LoRa mesh networking (Meshtastic + Reticulum)
+- ✅ SX1262 LoRa driver for Waveshare HAT
+- ✅ GPS wardriving with NMEA parser
+- ✅ SDR support (HackRF One + RTL-SDR via SoapySDR)
 
-### v2.0 (Future)
-- 🔲 Web UI (remote access)
-- 🔲 Bluetooth terminal control
-- 🔲 CAN Bus support
-- 🔲 ML signal classification
+### v4.0 (Released - Advanced Features)
+- ✅ Web UI (Flask-based remote access)
+- ✅ Real-time API for all modules
+- 🔲 Bluetooth terminal control (framework ready)
+- 🔲 CAN Bus support (framework ready)
+- 🔲 ML signal classification (framework ready)
+
+### v4.1 (Planned)
+- 🔲 Protocol decoders (Princeton, Came, Nice, KeeLoq)
+- 🔲 NDEF record parsing
+- 🔲 Audio demodulation (FM/AM)
+- 🔲 LTE/5G modem integration
 
 ---
 
 **Built with ❤️ for the security research community**
 
-*Last updated: 2025-11-17*
+*Last updated: 2025-11-18 | Version 3.0*

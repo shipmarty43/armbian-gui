@@ -24,21 +24,24 @@ fi
 echo "[1/5] Checking for Python 3..."
 if ! command -v python3 &> /dev/null; then
     echo "ERROR: Python 3 not found!"
-    echo "Please install Python 3.8 or higher:"
+    echo "Please install Python 3.11 or higher:"
     echo "  sudo apt update"
-    echo "  sudo apt install python3 python3-pip python3-venv"
+    echo "  sudo apt install python3.11 python3-pip python3-venv"
     exit 1
 fi
 
 PYTHON_VERSION=$(python3 --version | awk '{print $2}')
 echo "Python found: $PYTHON_VERSION"
 
-# Check Python version (need 3.8+)
+# Check Python version (need 3.11+)
 PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
 PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
 
-if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 8 ]); then
-    echo "ERROR: Python 3.8 or higher required, found $PYTHON_VERSION"
+if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 11 ]); then
+    echo "ERROR: Python 3.11 or higher required, found $PYTHON_VERSION"
+    echo "Please install Python 3.11:"
+    echo "  sudo apt update"
+    echo "  sudo apt install python3.11 python3.11-venv"
     exit 1
 fi
 

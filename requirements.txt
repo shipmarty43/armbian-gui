@@ -32,3 +32,28 @@ python-dateutil>=2.8.0
 # Testing (optional)
 pytest>=7.0
 pytest-cov
+
+# Web UI
+flask>=3.0.0
+flask-cors>=4.0.0
+
+# LoRa Mesh Networking (optional)
+# meshtastic>=2.2.0  # Uncomment for Meshtastic
+# rns>=0.7.0  # Reticulum, uncomment for Reticulum network
+
+# SDR (optional)
+# SoapySDR  # Install via: apt install python3-soapysdr
+
+# Bluetooth (optional)
+# pybluez>=0.23  # Uncomment for Bluetooth support
+
+# Serial/UART
+pyserial>=3.5
+
+# CAN Bus (optional)
+# python-can>=4.0.0  # Uncomment for CAN Bus
+
+# Machine Learning (optional)
+# numpy>=1.21.0  # Already included in core
+# scikit-learn>=1.0.0  # Uncomment for ML classification
+# tensorflow-lite>=2.10.0  # Uncomment for neural networks

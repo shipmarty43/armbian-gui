@@ -1,458 +1,326 @@
 """
-SDR Module - Software Defined Radio для HackRF One и RTL-SDR
+SDR Module - Software Defined Radio
+Support for HackRF One and RTL-SDR
 """
 
 from core.base_module import BaseModule
-from typing import List, Tuple, Callable
+from typing import List, Tuple, Callable, Optional
 import os
-from datetime import datetime
+import time
+import numpy as np
+
+try:
+    import SoapySDR
+    from SoapySDR import SOAPY_SDR_RX, SOAPY_SDR_CF32
+    SOAPY_AVAILABLE = True
+except ImportError:
+    SOAPY_AVAILABLE = False
 
 
 class SDRModule(BaseModule):
     """
     SDR модуль для работы с HackRF One и RTL-SDR.
-
+    
     Функции:
-    - IQ запись (RX)
-    - IQ воспроизведение (TX, только HackRF)
     - Spectrum analyzer
-    - Поддержка HackRF One и RTL-SDR
-    - Управление recordings
+    - Signal recording
+    - FM/AM demodulation
+    - Waterfall display
+    - IQ sample capture
     """
-
+    
     def __init__(self):
         super().__init__(
-            name="SDR Radio",
+            name="SDR Analysis",
             version="1.0.0",
             priority=6
         )
-
+        
         self.sdr = None
-        self.available_devices = {}
-        self.recordings_dir = "iq_samples"
-        self.recordings = []
-
-        os.makedirs(self.recordings_dir, exist_ok=True)
-
+        self.hardware_enabled = False
+        self.device_type = None
+        
+        # SDR parameters
+        self.center_freq = 100.0e6  # 100 MHz
+        self.sample_rate = 2.048e6  # 2.048 MHz
+        self.gain = 20
+        
+        self.samples_dir = "iq_samples"
+        os.makedirs(self.samples_dir, exist_ok=True)
+    
     def on_load(self):
         """Инициализация модуля"""
         self.log_info("SDR module loading...")
-
-        # Load configuration
-        config = self.load_config("config/main.yaml")
-        sdr_config = config.get('sdr', {})
-
-        if not sdr_config.get('enabled', False):
-            self.log_info("SDR disabled in config")
-            self.enabled = False
+        
+        if not SOAPY_AVAILABLE:
+            self.log_warning("SoapySDR not available - running in demo mode")
             return
-
-        # Initialize SDR controller
+            
+        # Load config
+        config = self.get_config().get('sdr', {})
+        
+        if not config.get('enabled', False):
+            self.log_info("SDR disabled in config")
+            return
+            
         try:
-            from .sdr_controller import SDRController
-
-            device_priority = sdr_config.get('device_priority', ['hackrf', 'rtlsdr'])
-            self.sdr = SDRController(device_priority=device_priority)
-
-            # Detect devices
-            self.available_devices = self.sdr.detect_devices()
-
-            if not any(self.available_devices.values()):
-                self.log_warning("No SDR devices detected")
-                self.log_warning("Install hackrf-tools or rtl-sdr package")
-                self.enabled = False
+            # List available devices
+            devices = SoapySDR.Device.enumerate()
+            
+            if not devices:
+                self.log_warning("No SDR devices found")
                 return
-
-            # Load recordings
-            self._load_recordings()
-
-            devices_str = ", ".join([k for k, v in self.available_devices.items() if v])
-            self.log_info(f"SDR module loaded: {devices_str}")
-            self.enabled = True
-
+                
+            # Try to open first device
+            device_args = devices[0]
+            self.sdr = SoapySDR.Device(device_args)
+            
+            # Detect device type
+            if 'hackrf' in str(device_args).lower():
+                self.device_type = "HackRF One"
+            elif 'rtlsdr' in str(device_args).lower():
+                self.device_type = "RTL-SDR"
+            else:
+                self.device_type = "Unknown SDR"
+                
+            self.hardware_enabled = True
+            self.log_info(f"SDR initialized: {self.device_type}")
+            
         except Exception as e:
             self.log_error(f"Failed to initialize SDR: {e}")
-            self.enabled = False
-
+    
     def on_unload(self):
         """Освобождение ресурсов"""
-        self.log_info("SDR module unloaded")
-
+        if self.sdr:
+            try:
+                self.sdr = None
+            except Exception as e:
+                self.log_error(f"Error closing SDR: {e}")
+    
     def get_menu_items(self) -> List[Tuple[str, Callable]]:
         """Пункты меню модуля"""
-        if not self.enabled:
-            return [
-                ("Status: No SDR Devices Detected", lambda: None),
-                ("Help", self.show_help),
-            ]
-
-        menu = []
-
-        # RX (both devices)
-        menu.append(("Record IQ Samples", self.record_iq))
-
-        # TX (HackRF only)
-        if self.available_devices.get('hackrf'):
-            menu.append(("Transmit IQ Samples", self.transmit_iq))
-
-        # Spectrum analyzer (RTL-SDR)
-        if self.available_devices.get('rtlsdr'):
-            menu.append(("Spectrum Analyzer", self.spectrum_analyzer))
-
-        menu.extend([
-            ("Recordings Manager", self.recordings_manager),
-            ("Settings", self.show_settings),
-        ])
-
-        return menu
-
+        return [
+            ("Spectrum Analyzer", self.spectrum_analyzer),
+            ("Record IQ Samples", self.record_samples),
+            ("FM Demodulator", self.fm_demod),
+            ("Waterfall Display", self.waterfall),
+            ("Device Settings", self.settings),
+            ("SDR Status", self.show_status),
+        ]
+    
     def get_status_widget(self) -> str:
         """Статус для статус-панели"""
-        if not self.enabled:
-            return "SDR: Disabled"
-
-        devices = []
-        if self.available_devices.get('hackrf'):
-            devices.append("HackRF")
-        if self.available_devices.get('rtlsdr'):
-            devices.append("RTL-SDR")
-
-        return f"SDR: {', '.join(devices)}"
-
-    # ========== Record IQ ==========
-
-    def record_iq(self):
-        """Запись IQ сэмплов"""
-        # Select device
-        device = self._select_device()
-        if not device:
+        hw_status = "HW" if self.hardware_enabled else "DEMO"
+        freq_mhz = self.center_freq / 1e6
+        return f"SDR[{hw_status}]: {freq_mhz:.2f}MHz"
+    
+    def get_hotkeys(self):
+        """Горячие клавиши"""
+        return {
+            's': self.spectrum_analyzer,
+            'r': self.record_samples,
+            'w': self.waterfall,
+        }
+    
+    # ========== Функции модуля ==========
+    
+    def spectrum_analyzer(self):
+        """Spectrum analyzer"""
+        if not self.hardware_enabled:
+            self.demo_spectrum_analyzer()
             return
-
-        # Get parameters
-        freq_input = self.get_user_input("Center frequency (MHz):", default="433.92")
-        rate_input = self.get_user_input("Sample rate (MSPS):", default="2.0")
-        duration_input = self.get_user_input("Duration (seconds):", default="10")
-
+            
         try:
-            frequency = float(freq_input)
-            sample_rate = float(rate_input)
-            duration = int(duration_input)
-        except ValueError:
-            self.show_error("Invalid parameters")
-            return
-
-        # Generate filename
-        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-        filename = f"iq_{int(frequency)}MHz_{timestamp}.bin"
-        filepath = os.path.join(self.recordings_dir, filename)
-
-        # Confirm
-        confirm = self.show_menu(
-            "Record IQ Samples",
-            [
-                f"Device: {device}",
-                f"Frequency: {frequency} MHz",
-                f"Sample rate: {sample_rate} MSPS",
-                f"Duration: {duration}s",
-                "",
-                f"Output: {filename}",
-                "",
-                "Start Recording",
-                "Cancel"
-            ]
-        )
-
-        if confirm != 7:
-            return
-
+            # Configure RX
+            self.sdr.setSampleRate(SOAPY_SDR_RX, 0, self.sample_rate)
+            self.sdr.setFrequency(SOAPY_SDR_RX, 0, self.center_freq)
+            self.sdr.setGain(SOAPY_SDR_RX, 0, self.gain)
+            
+            # Create stream
+            rxStream = self.sdr.setupStream(SOAPY_SDR_RX, SOAPY_SDR_CF32)
+            self.sdr.activateStream(rxStream)
+            
+            # Receive samples
+            buff = np.array([0]*1024, np.complex64)
+            sr = self.sdr.readStream(rxStream, [buff], len(buff))
+            
+            if sr.ret > 0:
+                # Compute FFT
+                fft = np.fft.fft(buff)
+                fft_shifted = np.fft.fftshift(fft)
+                magnitude = np.abs(fft_shifted)
+                magnitude_db = 20 * np.log10(magnitude + 1e-10)
+                
+                # Find peak
+                peak_idx = np.argmax(magnitude_db)
+                peak_db = magnitude_db[peak_idx]
+                
+                # Simple ASCII spectrum
+                spectrum_text = f"Spectrum Analyzer\n\n"
+                spectrum_text += f"Center: {self.center_freq/1e6:.2f}MHz\n"
+                spectrum_text += f"Sample Rate: {self.sample_rate/1e6:.2f}MHz\n"
+                spectrum_text += f"Gain: {self.gain}dB\n\n"
+                spectrum_text += f"Peak: {peak_db:.1f}dBFS\n\n"
+                
+                # Simple bar chart
+                for i in range(0, len(magnitude_db), 20):
+                    level = int(magnitude_db[i] + 100)  # Scale to 0-100
+                    bars = '█' * max(0, min(level, 50))
+                    spectrum_text += f"{bars}\n"
+                
+                self.show_message("Spectrum Analyzer", spectrum_text)
+            
+            # Cleanup
+            self.sdr.deactivateStream(rxStream)
+            self.sdr.closeStream(rxStream)
+            
+        except Exception as e:
+            self.show_error(f"Spectrum analyzer error: {e}")
+    
+    def demo_spectrum_analyzer(self):
+        """Demo spectrum analyzer"""
         self.show_message(
-            "Recording",
-            f"Recording IQ samples...\n\n"
-            f"{frequency} MHz @ {sample_rate} MSPS\n"
-            f"Duration: {duration}s\n\n"
-            "Please wait..."
+            "Spectrum Analyzer (DEMO)",
+            f"Spectrum Analyzer\n\n"
+            f"Center: {self.center_freq/1e6:.2f}MHz\n"
+            f"Span: {self.sample_rate/1e6:.2f}MHz\n"
+            f"RBW: 10kHz\n\n"
+            f"Peak: -45dBm @ 100.3MHz\n\n"
+            "[ASCII Waterfall would be here]\n\n"
+            "(Running in DEMO mode)\n"
+            "(Connect HackRF/RTL-SDR for real spectrum)"
         )
-
-        # Record
-        success = self.sdr.record_iq(frequency, sample_rate, duration, filepath, device)
-
-        if success:
-            # Get file size
-            file_size = os.path.getsize(filepath)
-            size_mb = file_size / (1024 * 1024)
-
+    
+    def record_samples(self):
+        """Record IQ samples"""
+        if not self.hardware_enabled:
+            self.show_message(
+                "Record IQ (DEMO)",
+                "IQ sample recording requires SDR hardware.\n\n"
+                "Connect HackRF One or RTL-SDR."
+            )
+            return
+            
+        duration = self.get_user_input("Duration (seconds):", default="5")
+        
+        try:
+            duration = int(duration)
+        except ValueError:
+            self.show_error("Invalid duration")
+            return
+            
+        try:
+            # Configure
+            self.sdr.setSampleRate(SOAPY_SDR_RX, 0, self.sample_rate)
+            self.sdr.setFrequency(SOAPY_SDR_RX, 0, self.center_freq)
+            self.sdr.setGain(SOAPY_SDR_RX, 0, self.gain)
+            
+            # Create stream
+            rxStream = self.sdr.setupStream(SOAPY_SDR_RX, SOAPY_SDR_CF32)
+            self.sdr.activateStream(rxStream)
+            
+            # Record
+            samples_to_read = int(self.sample_rate * duration)
+            all_samples = []
+            
+            self.show_message("Recording", f"Recording {duration}s...\nPlease wait.")
+            
+            while len(all_samples) < samples_to_read:
+                buff = np.array([0]*4096, np.complex64)
+                sr = self.sdr.readStream(rxStream, [buff], len(buff))
+                
+                if sr.ret > 0:
+                    all_samples.extend(buff[:sr.ret])
+            
+            # Save to file
+            filename = f"iq_{int(self.center_freq/1e6)}MHz_{int(time.time())}.npy"
+            filepath = os.path.join(self.samples_dir, filename)
+            
+            np.save(filepath, np.array(all_samples))
+            
+            # Cleanup
+            self.sdr.deactivateStream(rxStream)
+            self.sdr.closeStream(rxStream)
+            
             self.show_message(
                 "Recording Complete",
                 f"IQ samples saved!\n\n"
                 f"File: {filename}\n"
-                f"Size: {size_mb:.1f} MB\n"
-                f"Samples: {int(sample_rate * 1e6 * duration)}"
+                f"Samples: {len(all_samples)}\n"
+                f"Duration: {duration}s\n"
+                f"Center Freq: {self.center_freq/1e6:.2f}MHz"
             )
-
-            self.recordings.append({
-                'filename': filename,
-                'frequency': frequency,
-                'sample_rate': sample_rate,
-                'duration': duration,
-                'size': file_size
-            })
-
-        else:
-            self.show_error("Recording failed!\n\nCheck SDR connection.")
-
-    # ========== Transmit IQ ==========
-
-    def transmit_iq(self):
-        """Передача IQ сэмплов (только HackRF)"""
-        if not self.recordings:
-            self.show_message(
-                "No Recordings",
-                "No IQ recordings found.\n\n"
-                "Record some samples first."
-            )
-            return
-
-        # Select recording
-        recording_names = [r['filename'] for r in self.recordings] + ["Cancel"]
-
-        choice = self.show_menu("Select Recording", recording_names)
-
-        if choice >= len(self.recordings):
-            return
-
-        recording = self.recordings[choice]
-        filepath = os.path.join(self.recordings_dir, recording['filename'])
-
-        # Get TX parameters
+            
+        except Exception as e:
+            self.show_error(f"Recording error: {e}")
+    
+    def fm_demod(self):
+        """FM demodulator"""
+        self.show_message(
+            "FM Demodulator",
+            "FM Demodulator\n\n"
+            "Demodulate FM broadcast signals.\n\n"
+            "(Feature in development)\n"
+            "Requires audio output integration."
+        )
+    
+    def waterfall(self):
+        """Waterfall display"""
+        self.show_message(
+            "Waterfall Display",
+            "Waterfall Display\n\n"
+            "Real-time frequency vs time display.\n\n"
+            "(Feature in development)\n"
+            "Requires continuous streaming and rendering."
+        )
+    
+    def settings(self):
+        """Device settings"""
         freq_input = self.get_user_input(
-            "TX Frequency (MHz):",
-            default=str(recording['frequency'])
+            "Center Frequency (MHz):",
+            default=str(self.center_freq / 1e6)
         )
-
-        rate_input = self.get_user_input(
-            "Sample rate (MSPS):",
-            default=str(recording['sample_rate'])
-        )
-
+        
         try:
-            frequency = float(freq_input)
-            sample_rate = float(rate_input)
-        except ValueError:
-            self.show_error("Invalid parameters")
-            return
-
-        # Confirm
-        confirm = self.show_menu(
-            "Transmit IQ Samples",
-            [
-                "⚠️ WARNING: RF Transmission!",
-                "",
-                f"File: {recording['filename']}",
-                f"Frequency: {frequency} MHz",
-                f"Sample rate: {sample_rate} MSPS",
-                "",
-                "Make sure this is legal!",
-                "",
-                "Transmit",
-                "Cancel"
-            ]
-        )
-
-        if confirm != 8:
-            return
-
-        self.show_message(
-            "Transmitting",
-            f"Transmitting IQ samples...\n\n"
-            f"{frequency} MHz @ {sample_rate} MSPS\n\n"
-            "TX in progress..."
-        )
-
-        # Transmit
-        success = self.sdr.transmit(frequency, sample_rate, filepath, device="hackrf")
-
-        if success:
-            self.show_message("Complete", "Transmission complete!")
-        else:
-            self.show_error("Transmission failed!")
-
-    # ========== Spectrum Analyzer ==========
-
-    def spectrum_analyzer(self):
-        """Spectrum analyzer (RTL-SDR)"""
-        # Get parameters
-        start_input = self.get_user_input("Start frequency (MHz):", default="400")
-        stop_input = self.get_user_input("Stop frequency (MHz):", default="470")
-        bin_input = self.get_user_input("Bin size (MHz):", default="1.0")
-
-        try:
-            start_freq = float(start_input)
-            stop_freq = float(stop_input)
-            bin_size = float(bin_input)
-        except ValueError:
-            self.show_error("Invalid parameters")
-            return
-
-        self.show_message(
-            "Analyzing",
-            f"Spectrum analysis...\n\n"
-            f"{start_freq} - {stop_freq} MHz\n"
-            f"Bin size: {bin_size} MHz\n\n"
-            "Please wait..."
-        )
-
-        # Analyze
-        spectrum = self.sdr.spectrum_analyzer(start_freq, stop_freq, bin_size, device="rtlsdr")
-
-        if spectrum:
-            # Find peak
-            peak = max(spectrum, key=lambda x: x[1])
-
-            result_text = f"Spectrum Analysis Complete!\n\n"
-            result_text += f"Range: {start_freq}-{stop_freq} MHz\n"
-            result_text += f"Bins: {len(spectrum)}\n\n"
-            result_text += f"Peak: {peak[0]:.2f} MHz ({peak[1]:.1f} dB)\n\n"
-
-            # Show top 5 frequencies
-            sorted_spectrum = sorted(spectrum, key=lambda x: x[1], reverse=True)
-            result_text += "Top frequencies:\n"
-            for i, (freq, power) in enumerate(sorted_spectrum[:5], 1):
-                result_text += f"{i}. {freq:.2f} MHz: {power:.1f} dB\n"
-
-            self.show_message("Spectrum Analysis", result_text)
-
-        else:
-            self.show_error("Spectrum analysis failed!")
-
-    # ========== Recordings Manager ==========
-
-    def recordings_manager(self):
-        """Управление recordings"""
-        if not self.recordings:
+            freq_mhz = float(freq_input)
+            self.center_freq = freq_mhz * 1e6
+            
             self.show_message(
-                "Recordings Manager",
-                "No recordings found.\n\n"
-                "Record some IQ samples first."
+                "Settings",
+                f"Frequency set to {freq_mhz}MHz\n\n"
+                f"Sample Rate: {self.sample_rate/1e6}MHz\n"
+                f"Gain: {self.gain}dB"
             )
-            return
-
-        actions = [
-            "View Recordings",
-            "Delete Recording",
-            "Back"
-        ]
-
-        choice = self.show_menu("Recordings Manager", actions)
-
-        if choice == 0:
-            self._view_recordings()
-        elif choice == 1:
-            self._delete_recording()
-
-    def _view_recordings(self):
-        """View all recordings"""
-        recordings_text = "IQ Recordings:\n\n"
-
-        for i, rec in enumerate(self.recordings, 1):
-            size_mb = rec['size'] / (1024 * 1024)
-            recordings_text += f"{i}. {rec['filename']}\n"
-            recordings_text += f"   Freq: {rec['frequency']} MHz\n"
-            recordings_text += f"   Rate: {rec['sample_rate']} MSPS\n"
-            recordings_text += f"   Duration: {rec['duration']}s\n"
-            recordings_text += f"   Size: {size_mb:.1f} MB\n\n"
-
-        self.show_message("Recordings", recordings_text)
-
-    def _delete_recording(self):
-        """Delete recording"""
-        self.show_message("Delete", "Delete feature coming soon...")
-
-    def _load_recordings(self):
-        """Load recordings from directory"""
-        self.recordings = []
-
-        if not os.path.exists(self.recordings_dir):
-            return
-
-        for filename in os.listdir(self.recordings_dir):
-            if filename.endswith('.bin'):
-                filepath = os.path.join(self.recordings_dir, filename)
-                file_size = os.path.getsize(filepath)
-
-                # Try to parse filename for metadata
-                # Format: iq_433MHz_20231117_120000.bin
-                import re
-                match = re.search(r'iq_(\d+)MHz_', filename)
-                freq = float(match.group(1)) if match else 0
-
-                self.recordings.append({
-                    'filename': filename,
-                    'frequency': freq,
-                    'sample_rate': 2.0,  # Default
-                    'duration': 0,
-                    'size': file_size
-                })
-
-        self.log_info(f"Loaded {len(self.recordings)} recordings")
-
-    def _select_device(self) -> str:
-        """Select SDR device"""
-        available = [k for k, v in self.available_devices.items() if v]
-
-        if len(available) == 1:
-            return available[0]
-
-        if len(available) > 1:
-            choice = self.show_menu(
-                "Select SDR Device",
-                [d.upper() for d in available] + ["Cancel"]
+        except ValueError:
+            self.show_error("Invalid frequency")
+    
+    def show_status(self):
+        """SDR status"""
+        if self.hardware_enabled and self.sdr:
+            try:
+                status = (
+                    "SDR Hardware Status\n\n"
+                    f"Device: {self.device_type}\n"
+                    f"Status: ENABLED\n\n"
+                    f"Center Freq: {self.center_freq/1e6:.2f}MHz\n"
+                    f"Sample Rate: {self.sample_rate/1e6:.2f}MSPS\n"
+                    f"Gain: {self.gain}dB\n\n"
+                    "Supported Modes:\n"
+                    "- Spectrum Analyzer\n"
+                    "- IQ Recording\n"
+                    "- FM Demodulation (coming soon)\n"
+                )
+            except Exception as e:
+                status = f"SDR Error: {e}"
+        else:
+            status = (
+                "SDR Hardware Status\n\n"
+                "Status: DISABLED (Demo Mode)\n\n"
+                "To enable:\n"
+                "1. Connect HackRF One or RTL-SDR via USB\n"
+                "2. Install SoapySDR: apt install soapysdr-tools\n"
+                "3. Set enabled=true in config/main.yaml\n"
+                "4. Run as root for USB access\n"
             )
-
-            if choice < len(available):
-                return available[choice]
-
-        return None
-
-    # ========== Settings ==========
-
-    def show_settings(self):
-        """Настройки модуля"""
-        settings_text = "SDR Module Settings\n\n"
-
-        settings_text += "Devices:\n"
-        for device, available in self.available_devices.items():
-            status = "✓" if available else "✗"
-            settings_text += f"  {status} {device.upper()}\n"
-
-            if available and device in self.sdr.device_info:
-                info = self.sdr.device_info[device]
-                for key, value in info.items():
-                    settings_text += f"     {key}: {value}\n"
-
-        settings_text += f"\nRecordings directory: {self.recordings_dir}\n"
-        settings_text += f"Recordings: {len(self.recordings)}\n"
-
-        self.show_message("Settings", settings_text)
-
-    def show_help(self):
-        """Show help information"""
-        help_text = """SDR Module Help
-
-Supported Devices:
-- HackRF One (RX + TX)
-- RTL-SDR (RX only)
-
-Installation:
-- HackRF: apt install hackrf
-- RTL-SDR: apt install rtl-sdr
-
-Features:
-- IQ recording
-- IQ transmission (HackRF)
-- Spectrum analysis (RTL-SDR)
-
-File Format:
-- Complex int8 (IQ interleaved)
-- Compatible with GNU Radio
-"""
-        self.show_message("Help", help_text)
+            
+        self.show_message("SDR Status", status)
