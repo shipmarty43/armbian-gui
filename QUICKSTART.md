@@ -6,19 +6,16 @@
 # 1. Run the installation script
 bash install.sh
 
-# 2. If conda was just installed, reload your shell:
-source ~/.bashrc
-# or close and reopen your terminal
-
-# 3. The installation will:
-#    - Install Miniconda (if needed)
-#    - Create 'cyberdeck' conda environment
+# 2. The installation will:
+#    - Check for Python 3.8+
+#    - Install pip and venv if needed
+#    - Create virtual environment in ./venv
 #    - Install all Python dependencies
 #    - Set up directory structure
 
-# 4. If installation failed at "conda: command not found":
-#    Reload shell and run install.sh again:
-source ~/.bashrc
+# 3. If Python is missing, install it first:
+sudo apt update
+sudo apt install -y python3 python3-pip python3-venv
 bash install.sh
 ```
 
@@ -38,11 +35,11 @@ sudo ./cyberdeck
 
 ### Option 3: Manual activation
 ```bash
-conda activate cyberdeck
+source venv/bin/activate
 python core/main.py
 
 # Or with sudo for hardware:
-sudo /home/$USER/miniconda3/envs/cyberdeck/bin/python core/main.py
+sudo ./venv/bin/python core/main.py
 ```
 
 ### Why sudo?
@@ -106,7 +103,7 @@ Create custom modules:
 
 **Problem**: urwid import error
 ```bash
-conda activate cyberdeck
+source venv/bin/activate
 pip install urwid
 ```
 

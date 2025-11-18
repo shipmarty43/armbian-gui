@@ -16,6 +16,8 @@ NC='\033[0m' # No Color
 SCRIPT_DIR="$( cd "$( dirname "${BASH_SOURCE[0]}" )" && pwd )"
 cd "$SCRIPT_DIR"
 
+VENV_DIR="$SCRIPT_DIR/venv"
+
 # Баннер
 echo -e "${BLUE}"
 cat << "EOF"
@@ -37,53 +39,60 @@ echo -e "${NC}"
 
 echo -e "${GREEN}Starting CyberDeck Interface...${NC}\n"
 
-# Проверка наличия conda
-if command -v conda &> /dev/null; then
-    # Conda установлена
-    echo -e "${BLUE}[*]${NC} Conda detected"
+# Проверка наличия виртуального окружения
+if [ -d "$VENV_DIR" ]; then
+    echo -e "${BLUE}[*]${NC} Virtual environment found at: $VENV_DIR"
+    echo -e "${BLUE}[*]${NC} Activating virtual environment..."
 
-    # Инициализация conda для bash (если еще не инициализирована)
-    if [ -f "$HOME/miniconda3/etc/profile.d/conda.sh" ]; then
-        source "$HOME/miniconda3/etc/profile.d/conda.sh"
-    elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
-        source "$HOME/anaconda3/etc/profile.d/conda.sh"
-    fi
+    # Активация venv
+    source "$VENV_DIR/bin/activate"
 
-    # Проверка существования окружения cyberdeck
-    if conda env list | grep -q "cyberdeck"; then
-        echo -e "${BLUE}[*]${NC} Activating 'cyberdeck' environment..."
-        conda activate cyberdeck
-
-        if [ $? -eq 0 ]; then
-            echo -e "${GREEN}[✓]${NC} Environment activated"
-        else
-            echo -e "${YELLOW}[!]${NC} Failed to activate environment, using base"
-        fi
+    if [ $? -eq 0 ]; then
+        echo -e "${GREEN}[✓]${NC} Virtual environment activated"
     else
-        echo -e "${YELLOW}[!]${NC} Environment 'cyberdeck' not found"
-        echo -e "${YELLOW}[!]${NC} Run: ${BLUE}bash install.sh${NC} to create it"
-        echo -e "${YELLOW}[!]${NC} Using current Python environment..."
+        echo -e "${RED}[✗]${NC} Failed to activate virtual environment"
+        echo -e "${YELLOW}[!]${NC} Using system Python instead"
     fi
 else
-    # Conda не установлена
-    echo -e "${YELLOW}[!]${NC} Conda not found, using system Python"
+    echo -e "${YELLOW}[!]${NC} Virtual environment not found at: $VENV_DIR"
+    echo -e "${YELLOW}[!]${NC} Run: ${BLUE}bash install.sh${NC} to create it"
+    echo -e "${YELLOW}[!]${NC} Using system Python..."
 fi
 
 # Проверка Python версии
-PYTHON_VERSION=$(python3 --version 2>&1 | awk '{print $2}')
+PYTHON_CMD="python3"
+if [ -f "$VENV_DIR/bin/python" ]; then
+    PYTHON_CMD="$VENV_DIR/bin/python"
+fi
+
+PYTHON_VERSION=$($PYTHON_CMD --version 2>&1 | awk '{print $2}')
 echo -e "${BLUE}[*]${NC} Python version: $PYTHON_VERSION"
 
 # Проверка зависимостей
 echo -e "${BLUE}[*]${NC} Checking dependencies..."
-if ! python3 -c "import urwid" 2>/dev/null; then
+MISSING_DEPS=0
+
+if ! $PYTHON_CMD -c "import urwid" 2>/dev/null; then
     echo -e "${RED}[✗]${NC} Missing dependency: urwid"
-    echo -e "${YELLOW}[!]${NC} Run: ${BLUE}pip install urwid${NC}"
-    exit 1
+    MISSING_DEPS=1
 fi
 
-if ! python3 -c "import yaml" 2>/dev/null; then
+if ! $PYTHON_CMD -c "import yaml" 2>/dev/null; then
     echo -e "${RED}[✗]${NC} Missing dependency: PyYAML"
-    echo -e "${YELLOW}[!]${NC} Run: ${BLUE}pip install pyyaml${NC}"
+    MISSING_DEPS=1
+fi
+
+if ! $PYTHON_CMD -c "import numpy" 2>/dev/null; then
+    echo -e "${RED}[✗]${NC} Missing dependency: numpy"
+    MISSING_DEPS=1
+fi
+
+if [ $MISSING_DEPS -eq 1 ]; then
+    echo -e "${YELLOW}[!]${NC} Missing dependencies detected"
+    echo -e "${YELLOW}[!]${NC} Run: ${BLUE}bash install.sh${NC} to install all dependencies"
+    echo -e "${YELLOW}[!]${NC} Or install manually:"
+    echo -e "${YELLOW}[!]${NC}   ${BLUE}source venv/bin/activate${NC}"
+    echo -e "${YELLOW}[!]${NC}   ${BLUE}pip install -r requirements.txt${NC}"
     exit 1
 fi
 
@@ -114,7 +123,7 @@ echo -e "${GREEN}[*]${NC} Launching CyberDeck Interface...\n"
 echo -e "${BLUE}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}\n"
 
 # Передаем все аргументы командной строки в Python скрипт
-python3 core/main.py "$@"
+$PYTHON_CMD core/main.py "$@"
 
 EXIT_CODE=$?
 

@@ -4,7 +4,7 @@
 set -e
 
 INSTALL_DIR="$(pwd)"
-CONDA_DIR="$HOME/miniconda3"
+VENV_DIR="$INSTALL_DIR/venv"
 
 echo "========================================"
 echo "CyberDeck Interface v3.0 - Installation"
@@ -14,138 +14,128 @@ echo ""
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then
    echo "Running as root - Hardware access enabled"
-   # Adjust conda directory for root
-   CONDA_DIR="/root/miniconda3"
+   echo "Note: Virtual environment will be created in: $VENV_DIR"
 else
    echo "Running as user: $USER"
    echo "Note: You may need root privileges for hardware access (GPIO/SPI/I2C)"
 fi
 
-# 1. Check for Miniconda
-echo "[1/6] Checking for Conda..."
-CONDA_INSTALLED=false
-
-if ! command -v conda &> /dev/null; then
-    echo "Conda not found. Installing Miniconda..."
-
-    # Detect architecture
-    ARCH=$(uname -m)
-    if [ "$ARCH" == "aarch64" ]; then
-        MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-aarch64.sh"
-    else
-        MINICONDA_URL="https://repo.anaconda.com/miniconda/Miniconda3-latest-Linux-x86_64.sh"
-    fi
-
-    wget $MINICONDA_URL -O /tmp/miniconda.sh
-    bash /tmp/miniconda.sh -b -p $CONDA_DIR
-    rm /tmp/miniconda.sh
-
-    # Initialize conda for bash
-    $CONDA_DIR/bin/conda init bash
-
-    echo "Miniconda installed successfully"
-    CONDA_INSTALLED=true
-
-    # Source conda for current session
-    if [ -f "$CONDA_DIR/etc/profile.d/conda.sh" ]; then
-        source "$CONDA_DIR/etc/profile.d/conda.sh"
-    fi
-
-    # Reinitialize conda in current shell
-    eval "$($CONDA_DIR/bin/conda shell.bash hook)"
-
-else
-    echo "Conda found: $(which conda)"
-    # Make sure conda is initialized in current session
-    if [ -f "$CONDA_DIR/etc/profile.d/conda.sh" ]; then
-        source "$CONDA_DIR/etc/profile.d/conda.sh"
-    elif [ -f "$HOME/anaconda3/etc/profile.d/conda.sh" ]; then
-        source "$HOME/anaconda3/etc/profile.d/conda.sh"
-    fi
+# 1. Check for Python 3
+echo "[1/5] Checking for Python 3..."
+if ! command -v python3 &> /dev/null; then
+    echo "ERROR: Python 3 not found!"
+    echo "Please install Python 3.8 or higher:"
+    echo "  sudo apt update"
+    echo "  sudo apt install python3 python3-pip python3-venv"
+    exit 1
 fi
 
-# 2. Create Conda environment
-echo ""
-echo "[2/6] Creating Conda environment..."
-if conda env list | grep -q "^cyberdeck "; then
-    echo "Environment 'cyberdeck' already exists. Updating..."
-    conda env update -f environment.yml
-else
-    echo "Creating new environment 'cyberdeck'..."
-    conda env create -f environment.yml
+PYTHON_VERSION=$(python3 --version | awk '{print $2}')
+echo "Python found: $PYTHON_VERSION"
+
+# Check Python version (need 3.8+)
+PYTHON_MAJOR=$(echo $PYTHON_VERSION | cut -d. -f1)
+PYTHON_MINOR=$(echo $PYTHON_VERSION | cut -d. -f2)
+
+if [ "$PYTHON_MAJOR" -lt 3 ] || ([ "$PYTHON_MAJOR" -eq 3 ] && [ "$PYTHON_MINOR" -lt 8 ]); then
+    echo "ERROR: Python 3.8 or higher required, found $PYTHON_VERSION"
+    exit 1
 fi
 
-# 3. Install Python dependencies
+# 2. Check for pip and venv
 echo ""
-echo "[3/6] Installing Python dependencies..."
-eval "$(conda shell.bash hook)"
-conda activate cyberdeck
+echo "[2/5] Checking for pip and venv..."
+if ! python3 -m pip --version &> /dev/null; then
+    echo "pip not found. Installing..."
+    sudo apt update
+    sudo apt install -y python3-pip
+fi
+
+if ! python3 -m venv --help &> /dev/null; then
+    echo "venv not found. Installing..."
+    sudo apt install -y python3-venv
+fi
+
+echo "pip version: $(python3 -m pip --version)"
+
+# 3. Create virtual environment
+echo ""
+echo "[3/5] Creating virtual environment..."
+if [ -d "$VENV_DIR" ]; then
+    echo "Virtual environment already exists at: $VENV_DIR"
+    echo "Removing old virtual environment..."
+    rm -rf "$VENV_DIR"
+fi
+
+echo "Creating new virtual environment..."
+python3 -m venv "$VENV_DIR"
+
+# Activate virtual environment
+echo "Activating virtual environment..."
+source "$VENV_DIR/bin/activate"
+
+# Upgrade pip
+echo "Upgrading pip..."
+python -m pip install --upgrade pip
+
+# 4. Install Python dependencies
+echo ""
+echo "[4/5] Installing Python dependencies..."
+echo "This may take a few minutes..."
+
 pip install -r requirements.txt
 
-# 4. Create necessary directories
+# Install OPi.GPIO if on ARM platform
+ARCH=$(uname -m)
+if [ "$ARCH" == "aarch64" ] || [ "$ARCH" == "armv7l" ]; then
+    echo ""
+    echo "ARM platform detected. Installing OPi.GPIO..."
+    if pip install OPi.GPIO; then
+        echo "OPi.GPIO installed successfully"
+    else
+        echo "WARNING: Failed to install OPi.GPIO"
+        echo "You may need to install it manually for GPIO support"
+    fi
+fi
+
+# 5. Create necessary directories
 echo ""
-echo "[4/6] Creating directories..."
+echo "[5/5] Creating directories and setting permissions..."
 mkdir -p logs
 mkdir -p maps
 mkdir -p scripts
 mkdir -p iq_samples
 mkdir -p badusb_payloads
 
-# 5. Set permissions (if needed)
-echo ""
-echo "[5/6] Setting permissions..."
-
 # Make main.py executable
 chmod +x core/main.py
 
-# Create launcher script if it doesn't exist
-if [ ! -f "cyberdeck" ]; then
-    echo "Creating launcher script..."
-    cat > cyberdeck <<'EOF'
-#!/bin/bash
-# CyberDeck Interface Launcher
-
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-cd "$SCRIPT_DIR"
-
-eval "$(conda shell.bash hook)"
-conda activate cyberdeck
-
-python core/main.py "$@"
-EOF
-    chmod +x cyberdeck
-else
-    echo "Launcher script already exists, skipping..."
+# Make launcher script executable
+if [ -f "cyberdeck" ]; then
     chmod +x cyberdeck
 fi
 
-# 6. Optional: Add to PATH
-echo ""
-echo "[6/6] Creating launcher..."
-echo "Launcher script created: ./cyberdeck"
-
-# Add alias suggestion
+# Installation complete
 echo ""
 echo "========================================"
 echo "Installation Complete!"
 echo "========================================"
 echo ""
+echo "Virtual environment created at: $VENV_DIR"
+echo ""
 echo "To run CyberDeck Interface:"
-echo "  1. ./cyberdeck"
+echo "  ./cyberdeck"
 echo ""
-echo "Or activate the environment manually:"
-echo "  1. conda activate cyberdeck"
-echo "  2. python core/main.py"
-echo ""
-echo "Optional: Add alias to ~/.bashrc:"
-echo "  echo 'alias cyberdeck=\"cd $INSTALL_DIR && ./cyberdeck\"' >> ~/.bashrc"
+echo "Or activate the virtual environment manually:"
+echo "  source venv/bin/activate"
+echo "  python core/main.py"
 echo ""
 echo "Configuration file: config/main.yaml"
 echo "Edit this file to match your hardware setup."
 echo ""
 echo "For hardware interfaces (I2C, SPI, GPIO), you may need to:"
-echo "  - Install system dependencies (see docs/HARDWARE_SETUP.md)"
-echo "  - Add your user to appropriate groups (i2c, spi, gpio, dialout)"
+echo "  - Run as root: sudo ./cyberdeck"
+echo "  - Add your user to groups: sudo usermod -a -G gpio,spi,i2c,dialout \$USER"
 echo "  - Configure udev rules for USB devices"
 echo ""
 echo "See README.md for detailed documentation."
