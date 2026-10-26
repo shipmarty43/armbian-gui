@@ -148,6 +148,8 @@ class NMEAParser:
         return {'type': 'GSV'}
 
 
+from core.resources import close_attributes, cleanup_on_failure
+
 class GPSReader:
     """
     GPS UART/Serial reader.
@@ -172,6 +174,7 @@ class GPSReader:
         self.last_fix = None
         self.enabled = False
         
+    @cleanup_on_failure
     def initialize(self) -> bool:
         """
         Initialize GPS serial connection.
@@ -179,6 +182,8 @@ class GPSReader:
         Returns:
             bool: True if successful
         """
+        if self.enabled:
+            return True
         try:
             self.serial = serial.Serial(
                 self.port,
@@ -241,8 +246,5 @@ class GPSReader:
         return None
     
     def close(self):
-        """Close serial connection"""
-        if self.serial:
-            self.serial.close()
-            self.enabled = False
-            self.logger.info("GPS closed")
+        self.enabled = False
+        close_attributes(self, 'serial')

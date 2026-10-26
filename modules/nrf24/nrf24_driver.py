@@ -60,9 +60,12 @@ NRF24_PLL_LOCK = 0x10   # Бит 4 - PLL lock для carrier wave
 NRF24_TX_FULL = 0x20
 
 
+from core.resources import GpioLease, close_attributes, cleanup_on_failure
+
 class NRF24Spectrum:
     """nRF24L01+ спектроанализатор и джаммер для 2.4 ГГц"""
 
+    @cleanup_on_failure
     def __init__(self, ce_pin: int = 7, spi_bus: int = 0, spi_device: int = 0,
                  lna_enable: bool = True, pa_level: int = 3):
         """
@@ -81,10 +84,11 @@ class NRF24Spectrum:
         """
         self.logger = logging.getLogger("cyberdeck.nrf24")
 
+        self.spi = None
+        self._gpio = GpioLease(GPIO) if GPIO_AVAILABLE else None
+        self.enabled = False
         if not GPIO_AVAILABLE:
-            self.logger.error("OPi.GPIO not available")
-            self.enabled = False
-            return
+            raise RuntimeError("OPi.GPIO not available")
 
         self.ce_pin = ce_pin
         self.lna_enable = lna_enable
@@ -92,9 +96,7 @@ class NRF24Spectrum:
         self.enabled = False
 
         # Настройка GPIO
-        GPIO.setmode(GPIO.BOARD)
-        GPIO.setup(self.ce_pin, GPIO.OUT)
-        GPIO.output(self.ce_pin, GPIO.LOW)
+        self._gpio.setup(self.ce_pin, GPIO.OUT, initial=GPIO.LOW)
 
         # Настройка SPI
         self.spi = spidev.SpiDev()
@@ -105,6 +107,7 @@ class NRF24Spectrum:
         except Exception as e:
             self.logger.error(f"Failed to open SPI: {e}")
             self.enabled = False
+            self.close()
             return
 
         # Диапазон каналов (0-125, что соответствует 2400-2525 МГц)
@@ -380,10 +383,14 @@ class NRF24Spectrum:
         }
 
     def cleanup(self):
-        """Освобождение ресурсов"""
-        self.ce_low()
-        if self.spi:
-            self.spi.close()
-        if GPIO_AVAILABLE:
-            GPIO.cleanup()
-        self.logger.info("nRF24 ресурсы освобождены")
+        self.close()
+
+    def close(self):
+        try:
+            if self._gpio is not None and self.ce_pin in self._gpio.pins:
+                self.ce_low()
+        except Exception:
+            self.logger.exception("nRF24 CE reset failed")
+        finally:
+            self.enabled = False
+            close_attributes(self, 'spi', '_gpio')

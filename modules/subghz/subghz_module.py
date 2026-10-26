@@ -92,7 +92,7 @@ class SubGHzModule(BaseModule):
         """Освобождение ресурсов"""
         self.log_info("Sub-GHz module unloaded")
 
-        if self.cc1101 and self.hardware_enabled:
+        if self.cc1101:
             try:
                 self.cc1101.close()
                 self.log_info("CC1101 closed")

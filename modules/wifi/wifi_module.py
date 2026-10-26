@@ -67,10 +67,10 @@ class WiFiModule(BaseModule):
 
     def on_unload(self):
         """Освобождение ресурсов"""
-        # Restore managed mode on all adapters
+        if self.wardriving_scanner:
+            self.wardriving_scanner.stop_scan()
         if self.hcxtools:
-            for adapter in self.adapters:
-                self.hcxtools.set_managed_mode(adapter)
+            self.hcxtools.close()
 
         self.log_info("WiFi module unloaded")
 

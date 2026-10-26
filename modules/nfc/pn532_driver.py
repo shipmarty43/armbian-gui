@@ -78,6 +78,8 @@ PN532_ACK = bytes([0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00])
 PN532_NACK = bytes([0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00])
 
 
+from core.resources import GpioLease, close_attributes, cleanup_on_failure
+
 class PN532:
     """
     PN532 NFC/RFID контроллер driver.
@@ -90,6 +92,7 @@ class PN532:
     - Card emulation (HCE)
     """
 
+    @cleanup_on_failure
     def __init__(self, interface: str = 'spi', spi_bus: int = 1, spi_device: int = 2,
                  cs_pin: int = 23, reset_pin: Optional[int] = None,
                  i2c_bus: int = 0, i2c_address: int = 0x24):
@@ -107,6 +110,7 @@ class PN532:
         """
         self.logger = logging.getLogger("cyberdeck.pn532")
 
+        self._gpio = GpioLease(GPIO) if GPIO_AVAILABLE else None
         self.interface = interface
         self.spi = None
         self.i2c = None
@@ -115,15 +119,16 @@ class PN532:
         self.enabled = False
 
         # GPIO setup for reset
-        if reset_pin and GPIO_AVAILABLE:
-            GPIO.setmode(GPIO.BOARD)
-            GPIO.setup(reset_pin, GPIO.OUT)
-            GPIO.output(reset_pin, GPIO.HIGH)
+        if reset_pin is not None:
+            if self._gpio is None:
+                raise RuntimeError("Reset GPIO requested but GPIO is unavailable")
+            self._gpio.setup(reset_pin, GPIO.OUT, initial=GPIO.HIGH)
 
         # Initialize interface
         if interface == 'spi':
             if not SPI_AVAILABLE:
                 self.logger.error("spidev not available")
+                self.close()
                 return
 
             try:
@@ -134,6 +139,7 @@ class PN532:
                 self.logger.info(f"PN532 SPI opened: {spi_bus}.{spi_device}")
             except Exception as e:
                 self.logger.error(f"Failed to open SPI: {e}")
+                self.close()
                 return
 
         elif interface == 'i2c':
@@ -144,12 +150,15 @@ class PN532:
                 self.logger.info(f"PN532 I2C opened: bus {i2c_bus}, addr 0x{i2c_address:02X}")
             except Exception as e:
                 self.logger.error(f"Failed to open I2C: {e}")
+                self.close()
                 return
 
         else:
             self.logger.error(f"Unsupported interface: {interface}")
+            self.close()
             return
 
+    @cleanup_on_failure
     def initialize(self) -> bool:
         """
         Initialize PN532 chip.
@@ -157,6 +166,13 @@ class PN532:
         Returns:
             bool: True if successful
         """
+        if self.enabled:
+            return True
+        if ((self.interface == 'spi' and self.spi is None) or
+                (self.interface == 'i2c' and self.i2c is None) or
+                self.interface not in ('spi', 'i2c')):
+            return False
+
         # Reset if pin available
         if self.reset_pin:
             self._hardware_reset()
@@ -519,10 +535,5 @@ class PN532:
         return status == 0x00
 
     def close(self):
-        """Close connection"""
-        if self.spi:
-            self.spi.close()
-        if GPIO_AVAILABLE and self.reset_pin:
-            GPIO.cleanup()
         self.enabled = False
-        self.logger.info("PN532 closed")
+        close_attributes(self, 'spi', 'i2c', '_gpio')

@@ -10,23 +10,33 @@ The technical installation and usage examples below do not grant such permission
 
 ---
 
-## 🚀 Features
+## Verification status
 
-### Core Capabilities
-- **Sub-GHz Analysis (CC1101)**: Capture and replay 433MHz signals (300-928MHz range)
-- **NFC/RFID Tools (PN532)**: Read, emulate, and bruteforce Mifare cards
+Experimental: see [implementation and verification status](IMPLEMENTATION_STATUS.md).
+Host tests do not establish device compatibility or working RF protocols. For a
+new image, `config/opi-zero2w-minimal.yaml` loads only the system module.
+`python3 core/main.py --config opi-zero2w-minimal.yaml --check-config` checks the
+profile without initializing hardware. Existing `main.yaml` wiring examples
+contain conflicts when all peripherals are enabled together; validation reports
+the affected modules instead of opening conflicting devices.
+
+## Modules in the source tree
+
+### Experimental modules (hardware validation pending)
+- **Sub-GHz (CC1101)**: SPI/FIFO driver and analysis UI; arbitrary RAW pulse capture and replay fidelity unverified
+- **NFC/RFID (PN532)**: Driver and card-operation menus; protocol/device coverage unverified
 - **WiFi Security**: 6 attack scenarios with hcxtools, wardriving with GPS
-- **LoRa Mesh (SX1262)**: Meshtastic and Reticulum integration
+- **LoRa (SX1262)**: Driver and experimental mesh code; Meshtastic interoperability unverified
 - **SDR Analysis**: HackRF One and RTL-SDR support
 - **BadUSB**: USB Gadget HID keyboard emulation
 - **GPS Tracking**: Geolocation and wardriving maps
 
 ### Architecture
 - **Modular Plugin System**: Dynamic module loading with priority-based initialization
-- **Vim-Style Interface**: curses-based TUI with vim navigation and full mouse/touchscreen support
+- **Vim-Style Interface**: urwid TUI with keyboard navigation and mouse input; physical touchscreen testing pending
 - **Event Bus**: Pub/sub system for inter-module communication
-- **System Monitoring**: Battery (MAX17043), temperature, WiFi/LTE signal tracking
-- **Session Logging**: Complete audit trail of all operations
+- **System Monitoring**: DFR0528 UPS MCU, temperature, WiFi/LTE status
+- **Session Logging**: Application and module logs
 - **Lightweight**: Pure Python with venv, no heavy dependencies
 
 ---
@@ -39,14 +49,14 @@ The technical installation and usage examples below do not grant such permission
   - PN532 NFC/RFID module (I2C/SPI)
   - CC1101 Sub-GHz transceiver (SPI)
   - SX1262 LoRa module (SPI)
-  - MAX17043 battery monitor (I2C)
+  - DFR0528 UPS board (I2C MCU at 0x10; contains a MAX17043)
   - GPS module (UART)
   - 2x WiFi adapters with monitor mode (e.g., RTL8812AU, MT7612U)
   - HackRF One or RTL-SDR (USB)
   - Proxmark3 V5.0 (USB)
 
 ### Software
-- **OS**: Armbian (Ubuntu 22.04 base)
+- **OS**: Armbian; exact image/device compatibility must be tested
 - **Python**: 3.11+
 - **pip** and **venv**: For environment management
 

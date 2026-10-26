@@ -5,9 +5,12 @@ Module Loader - динамическая загрузка и управлени�
 import os
 import sys
 import importlib
+import importlib.util
+from pathlib import Path
 import logging
 from typing import List, Optional, Dict
 from core.base_module import BaseModule
+from core.hardware_config import hardware_errors, module_settings
 
 
 class ModuleLoader:
@@ -32,6 +35,7 @@ class ModuleLoader:
 
         self.module_paths = module_paths
         self.modules: Dict[str, BaseModule] = {}
+        self.status = {}
         self.logger = logging.getLogger("cyberdeck.moduleloader")
 
     @classmethod
@@ -79,9 +83,31 @@ class ModuleLoader:
             BaseModule or None: Экземпляр модуля
         """
         try:
-            # Импортируем модуль
+            if not module_name.isidentifier():
+                raise ValueError('Module name must be a Python identifier')
             module_package = f"modules.{module_name}"
-            imported = importlib.import_module(module_package)
+            source = next((Path(base) / module_name / '__init__.py'
+                           for base in self.module_paths
+                           if (Path(base) / module_name / '__init__.py').is_file()), None)
+            if source is None:
+                raise ImportError(f'{module_name} not found in configured module paths')
+            source = source.resolve()
+            imported = sys.modules.get(module_package)
+            if imported is not None and Path(imported.__file__).resolve() != source:
+                raise ImportError(f'{module_package} already imported from another path; restart to change paths')
+            if imported is None:
+                importlib.import_module('modules')
+                spec = importlib.util.spec_from_file_location(module_package, source,
+                    submodule_search_locations=[str(source.parent)])
+                imported = importlib.util.module_from_spec(spec)
+                sys.modules[module_package] = imported
+                try:
+                    spec.loader.exec_module(imported)
+                except BaseException:
+                    for key in list(sys.modules):
+                        if key == module_package or key.startswith(module_package + '.'):
+                            del sys.modules[key]
+                    raise
 
             # Ищем класс, наследующий BaseModule
             module_class = None
@@ -129,12 +155,27 @@ class ModuleLoader:
         discovered = (self.discover_modules() if module_names is None
                       else list(dict.fromkeys(module_names)))
         loaded = []
+        config = config if config is not None else {}
+        errors = hardware_errors(config, discovered)
 
         for module_name in discovered:
+            if module_name in self.modules:
+                loaded.append(self.modules[module_name])
+                continue
+            if module_name in errors:
+                self.status[module_name] = '; '.join(errors[module_name])
+                self.logger.error('%s: %s', module_name, self.status[module_name])
+                continue
+            if module_settings(config, module_name).get('enabled') is False:
+                self.status[module_name] = 'disabled in configuration'
+                continue
             module = self.load_module(module_name)
             if module:
                 loaded.append(module)
-                module.config = config if config is not None else {}
+                module.config = config
+                module.module_id = module_name
+            else:
+                self.status[module_name] = "import failed or module not found"
 
         # Сортировка по приоритету
         if priority_order:
@@ -142,16 +183,26 @@ class ModuleLoader:
 
         initialized = []
         for module in loaded:
+            module_id = getattr(module, 'module_id', module.name)
+            if module_id in self.modules:
+                initialized.append(module)
+                continue
             try:
                 module.on_load()
-            except Exception as e:
-                self.logger.error(f"Error in {module.name}.on_load(): {e}")
-                try:
-                    module.on_unload()
-                except Exception:
-                    self.logger.exception(f"Error cleaning up {module.name}")
+                ready = module.enabled and (not hasattr(module, 'hardware_enabled') or module.hardware_enabled)
+            except BaseException as exc:
+                self.status[module_id] = str(exc) or type(exc).__name__
+                self.logger.error('Error in %s.on_load(): %s', module.name, exc)
+                self._dispose(module)
+                if not isinstance(exc, Exception):
+                    raise
                 continue
-            self.modules[module.name] = module
+            if not ready:
+                self.status[module_id] = 'hardware unavailable or initialization failed'
+                self._dispose(module)
+                continue
+            self.status[module_id] = 'initialized (hardware operation not verified)'
+            self.modules[module_id] = module
             initialized.append(module)
 
         self.logger.info(f"Loaded {len(initialized)} modules total")
@@ -167,7 +218,8 @@ class ModuleLoader:
         Returns:
             BaseModule or None: Экземпляр модуля
         """
-        return self.modules.get(module_name)
+        return self.modules.get(module_name) or next(
+            (m for m in self.modules.values() if m.name == module_name), None)
 
     def get_all_modules(self) -> List[BaseModule]:
         """
@@ -188,18 +240,23 @@ class ModuleLoader:
         if module_name in self.modules:
             module = self.modules[module_name]
 
-            try:
-                module.on_unload()
-            except Exception as e:
-                self.logger.error(
-                    f"Error in {module_name}.on_unload(): {e}"
-                )
-
+            self._dispose(module)
             del self.modules[module_name]
             self.logger.info(f"Unloaded module: {module_name}")
 
+    def _dispose(self, module):
+        try:
+            module.on_unload()
+        except Exception:
+            self.logger.exception('Error cleaning up %s', module.name)
+        finally:
+            module.release_subscriptions()
+            module.enabled = False
+            if hasattr(module, 'hardware_enabled'):
+                module.hardware_enabled = False
+
     def unload_all(self):
         """Выгрузить все модули"""
-        module_names = list(self.modules.keys())
+        module_names = list(reversed(self.modules))
         for name in module_names:
             self.unload_module(name)

@@ -20,6 +20,8 @@ except ImportError:
     GPIO_AVAILABLE = False
 
 
+from core.resources import GpioLease, close_attributes, cleanup_on_failure
+
 class SX1262:
     """
     SX1262 LoRa transceiver driver for Waveshare HAT.
@@ -66,6 +68,7 @@ class SX1262:
         self.busy_pin = busy_pin
         self.dio1_pin = dio1_pin
         
+        self._gpio = GpioLease(GPIO) if GPIO_AVAILABLE else None
         self.spi = None
         self.enabled = False
         
@@ -76,6 +79,7 @@ class SX1262:
         self.coding_rate = 5
         self.tx_power = 22  # dBm
         
+    @cleanup_on_failure
     def initialize(self) -> bool:
         """
         Initialize SX1262 chip.
@@ -83,16 +87,17 @@ class SX1262:
         Returns:
             bool: True if successful
         """
+        if self.enabled:
+            return True
         try:
             if not SPI_AVAILABLE or not GPIO_AVAILABLE:
                 self.logger.error("SPI or GPIO not available")
                 return False
                 
             # Initialize GPIO
-            GPIO.setmode(GPIO.CUSTOM)
-            GPIO.setup(self.reset_pin, GPIO.OUT)
-            GPIO.setup(self.busy_pin, GPIO.IN)
-            GPIO.setup(self.dio1_pin, GPIO.IN)
+            self._gpio.setup(self.reset_pin, GPIO.OUT)
+            self._gpio.setup(self.busy_pin, GPIO.IN)
+            self._gpio.setup(self.dio1_pin, GPIO.IN)
             
             # Initialize SPI
             self.spi = spidev.SpiDev()
@@ -267,9 +272,13 @@ class SX1262:
         return rssi_dbm
     
     def close(self):
-        """Close SPI"""
-        if self.spi:
-            self.set_standby()
-            self.spi.close()
+        try:
+            if self.spi is not None and self.enabled:
+                self.set_standby()
+        except Exception:
+            self.logger.exception("SX1262 standby failed")
+        finally:
             self.enabled = False
-            self.logger.info("SX1262 closed")
+            close_attributes(self, 'spi')
+            if self._gpio is not None:
+                self._gpio.close()

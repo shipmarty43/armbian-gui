@@ -21,6 +21,8 @@ except ImportError:
 
 
 # CC1101 Register addresses
+from core.resources import GpioLease, close_attributes, cleanup_on_failure
+
 class CC1101Registers:
     """CC1101 configuration registers"""
     IOCFG2 = 0x00  # GDO2 output pin configuration
@@ -114,11 +116,6 @@ class CC1101:
         """
         self.logger = logging.getLogger("cyberdeck.cc1101")
 
-        if not SPI_AVAILABLE:
-            self.logger.error("spidev not available")
-            self.enabled = False
-            return
-
         self.spi_bus = spi_bus
         self.spi_device = spi_device
         self.cs_pin = cs_pin
@@ -129,6 +126,7 @@ class CC1101:
         self.frequency = 433.92  # MHz
         self.modulation = "ASK_OOK"
 
+    @cleanup_on_failure
     def initialize(self) -> bool:
         """
         Initialize CC1101 chip.
@@ -136,6 +134,10 @@ class CC1101:
         Returns:
             bool: True if successful
         """
+        if self.enabled:
+            return True
+        if not SPI_AVAILABLE:
+            return False
         try:
             # Open SPI
             self.spi = spidev.SpiDev()
@@ -465,9 +467,12 @@ class CC1101:
         return None
 
     def close(self):
-        """Close SPI connection"""
-        if self.spi:
-            self.enter_idle()
-            self.spi.close()
+        """Release even if the chip no longer answers the standby command."""
+        try:
+            if self.spi is not None and self.enabled:
+                self.enter_idle()
+        except Exception:
+            self.logger.exception("CC1101 standby failed")
+        finally:
             self.enabled = False
-            self.logger.info("CC1101 closed")
+            close_attributes(self, 'spi')

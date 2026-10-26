@@ -3,6 +3,8 @@ HCXTools Wrapper - обёртка для работы с hcxdumptool, hcxpcapngt
 """
 
 import subprocess
+import json
+from core.resources import stop_process
 import os
 import time
 import logging
@@ -22,6 +24,8 @@ class HCXToolsWrapper:
         """
         self.logger = logging.getLogger("cyberdeck.hcxtools")
         self.captures_dir = captures_dir
+        self._changed_interfaces = {}
+        self._processes = set()
         os.makedirs(captures_dir, exist_ok=True)
 
         # Check if tools are available
@@ -45,66 +49,66 @@ class HCXToolsWrapper:
             return False
 
     def set_monitor_mode(self, interface: str, channel: Optional[int] = None) -> bool:
-        """
-        Set interface to monitor mode.
-
-        Args:
-            interface: WiFi interface (e.g., wlan0)
-            channel: Optional channel to set
-
-        Returns:
-            bool: True if successful
-        """
+        """Only change a managed interface whose original link state is known."""
         try:
-            # Bring interface down
-            subprocess.run(["ip", "link", "set", interface, "down"],
-                          check=True, timeout=5)
-
-            # Set monitor mode
-            subprocess.run(["iw", interface, "set", "monitor", "none"],
-                          check=True, timeout=5)
-
-            # Bring interface up
-            subprocess.run(["ip", "link", "set", interface, "up"],
-                          check=True, timeout=5)
-
-            # Set channel if specified
+            if interface not in self._changed_interfaces:
+                info = subprocess.run(['iw', 'dev', interface, 'info'], check=True,
+                                      capture_output=True, text=True, timeout=5).stdout
+                types = [line.split()[1] for line in info.splitlines()
+                         if line.strip().startswith('type ')]
+                if types != ['managed']:
+                    self.logger.error('Refusing to change %s: original mode is not managed', interface)
+                    return False
+                info = subprocess.run(['ip', '-j', 'link', 'show', 'dev', interface],
+                                      check=True, capture_output=True, text=True, timeout=5).stdout
+                self._changed_interfaces[interface] = 'UP' in json.loads(info)[0]['flags']
+            subprocess.run(['ip', 'link', 'set', interface, 'down'], check=True, timeout=5)
+            subprocess.run(['iw', interface, 'set', 'monitor', 'none'], check=True, timeout=5)
+            subprocess.run(['ip', 'link', 'set', interface, 'up'], check=True, timeout=5)
             if channel:
-                subprocess.run(["iw", interface, "set", "channel", str(channel)],
-                              check=True, timeout=5)
-
-            self.logger.info(f"Set {interface} to monitor mode" +
-                           (f" on channel {channel}" if channel else ""))
+                subprocess.run(['iw', interface, 'set', 'channel', str(channel)], check=True, timeout=5)
             return True
-
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Failed to set monitor mode: {e}")
+        except Exception:
+            self.logger.exception('Monitor mode setup failed for %s', interface)
+            self.set_managed_mode(interface)
             return False
 
     def set_managed_mode(self, interface: str) -> bool:
-        """
-        Set interface back to managed mode.
-
-        Args:
-            interface: WiFi interface
-
-        Returns:
-            bool: True if successful
-        """
-        try:
-            subprocess.run(["ip", "link", "set", interface, "down"],
-                          check=True, timeout=5)
-            subprocess.run(["iw", interface, "set", "type", "managed"],
-                          check=True, timeout=5)
-            subprocess.run(["ip", "link", "set", interface, "up"],
-                          check=True, timeout=5)
-
-            self.logger.info(f"Set {interface} to managed mode")
+        """Restore only an interface changed by this wrapper, including UP/DOWN."""
+        if interface not in self._changed_interfaces:
             return True
-
-        except subprocess.CalledProcessError as e:
-            self.logger.error(f"Failed to set managed mode: {e}")
+        try:
+            subprocess.run(['ip', 'link', 'set', interface, 'down'], check=True, timeout=5)
+            subprocess.run(['iw', interface, 'set', 'type', 'managed'], check=True, timeout=5)
+            state = 'up' if self._changed_interfaces[interface] else 'down'
+            subprocess.run(['ip', 'link', 'set', interface, state], check=True, timeout=5)
+            del self._changed_interfaces[interface]
+            return True
+        except Exception:
+            self.logger.exception('Interface restoration failed for %s', interface)
             return False
+
+    def _run_timed_process(self, cmd, duration):
+        process = subprocess.Popen(cmd, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        self._processes.add(process)
+        try:
+            time.sleep(duration)
+        finally:
+            try:
+                stop_process(process)
+            finally:
+                self._processes.discard(process)
+
+    def close(self):
+        for process in list(self._processes):
+            try:
+                stop_process(process)
+            except Exception:
+                self.logger.exception('Child process cleanup failed')
+            finally:
+                self._processes.discard(process)
+        for interface in list(self._changed_interfaces):
+            self.set_managed_mode(interface)
 
     def passive_capture(self, interface: str, duration: int = 60,
                        output_prefix: Optional[str] = None) -> Optional[str]:
@@ -140,16 +144,7 @@ class HCXToolsWrapper:
 
             self.logger.info(f"Starting passive capture on {interface} for {duration}s")
 
-            process = subprocess.Popen(cmd,
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE)
-
-            # Wait for specified duration
-            time.sleep(duration)
-
-            # Stop capture
-            process.terminate()
-            process.wait(timeout=5)
+            self._run_timed_process(cmd, duration)
 
             if os.path.exists(output_file):
                 self.logger.info(f"Capture saved: {output_file}")
@@ -208,14 +203,7 @@ class HCXToolsWrapper:
             self.logger.info(f"Starting active capture on {interface}" +
                            (f" targeting {target_bssid}" if target_bssid else ""))
 
-            process = subprocess.Popen(cmd,
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE)
-
-            time.sleep(duration)
-
-            process.terminate()
-            process.wait(timeout=5)
+            self._run_timed_process(cmd, duration)
 
             if os.path.exists(output_file):
                 self.logger.info(f"Active capture saved: {output_file}")
@@ -262,14 +250,7 @@ class HCXToolsWrapper:
 
             self.logger.info(f"Starting PMKID attack on {interface}")
 
-            process = subprocess.Popen(cmd,
-                                      stdout=subprocess.PIPE,
-                                      stderr=subprocess.PIPE)
-
-            time.sleep(duration)
-
-            process.terminate()
-            process.wait(timeout=5)
+            self._run_timed_process(cmd, duration)
 
             if os.path.exists(output_file):
                 return output_file

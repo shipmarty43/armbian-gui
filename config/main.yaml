@@ -1,4 +1,7 @@
-# CyberDeck Interface Configuration v2.0
+# CyberDeck Interface Configuration
+# Hardware entries are wiring examples, not a verified board profile.
+# Resolve SPI/GPIO conflicts and enable only physically connected modules.
+# GPIO pins use physical BOARD numbering; spidev controls CS, not cs_pin.
 
 system:
   device: "orangepi_zero2w"  # or "orangepi_3"
@@ -125,7 +128,6 @@ modules:
     - "badusb"
     - "bluetooth"
     - "sdr"
-    - "rfid"  # ✓ Added - Proxmark3 RFID
     - "system"
 
   paths:

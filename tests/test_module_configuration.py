@@ -166,3 +166,10 @@ def test_pn532_uses_declared_smbus2_dependency(monkeypatch):
     bus.assert_called_once_with(3)
     assert device.i2c is bus.return_value
     assert device.i2c_address == 0x24
+
+
+@pytest.mark.parametrize('contents', ['hardware: []', 'hardware: {gps: null}',
+                                      'modules: {autoload: gps}', 'modules: {paths: [2]}'])
+def test_invalid_nested_config_rejected_before_startup(tmp_path, contents):
+    (tmp_path / 'main.yaml').write_text(contents)
+    assert ConfigLoader(str(tmp_path)).load('main.yaml') == {}

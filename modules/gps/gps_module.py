@@ -80,7 +80,7 @@ class GPSModule(BaseModule):
     
     def on_unload(self):
         """Освобождение ресурсов"""
-        if self.gps and self.hardware_enabled:
+        if self.gps:
             try:
                 self.gps.close()
             except Exception as e:

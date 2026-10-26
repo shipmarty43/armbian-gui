@@ -67,7 +67,7 @@ class EventBus:
         self.logger.debug(f"Emitting event: {event_name}")
 
         if event_name in self.subscribers:
-            for callback in self.subscribers[event_name]:
+            for callback in list(self.subscribers[event_name]):
                 try:
                     callback(data)
                 except Exception as e:

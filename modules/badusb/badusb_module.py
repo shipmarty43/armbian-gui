@@ -77,7 +77,7 @@ class BadUSBModule(BaseModule):
 
     def on_unload(self):
         """Освобождение ресурсов"""
-        if self.usb_gadget and self.gadget_enabled:
+        if self.usb_gadget:
             self.usb_gadget.cleanup()
 
         self.log_info("BadUSB module unloaded")

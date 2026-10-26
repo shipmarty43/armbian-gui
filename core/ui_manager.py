@@ -7,6 +7,7 @@ import logging
 from typing import List, Tuple, Callable, Optional, Dict, Any
 from datetime import datetime
 from core.cpu_power import CpuPowerManager
+from core.dialogs import Dialog, ActionCancelled
 
 
 class SelectableText(urwid.Text):
@@ -113,6 +114,8 @@ class UIManager:
             modules = []
 
         self.modules = modules
+        self.loop = None
+        self._progress_view = None
         self.logger = logging.getLogger("cyberdeck.ui")
 
         # Мониторы (будут установлены позже)
@@ -357,20 +360,13 @@ class UIManager:
         Left Click  - Select button/menu item
         Scroll Up   - Move up in list
         Scroll Down - Move down in list
-        Drag        - Scroll through content
-
-        Commands (press ':'):
-        :quit     - Exit application
-        :help     - Show help
-        :log view - View logs
 
         Features:
-        - Full mouse and touchscreen support
+        - Keyboard and mouse navigation
         - All buttons are clickable
         - Mouse wheel scrolling
         - Vim-style keyboard navigation
         - Dynamic module loading
-        - Each module has its own hotkeys
         """
         self.show_message("Help", help_text)
 
@@ -404,7 +400,7 @@ class UIManager:
         # Создаём кнопки для каждого пункта меню
         for title, callback in menu_items_data:
             button = urwid.Button(title)
-            urwid.connect_signal(button, 'click', lambda b, cb=callback: cb())
+            urwid.connect_signal(button, 'click', lambda b, cb=callback: self._run_action(cb))
             menu_items.append(
                 urwid.AttrMap(button, 'menu_item', 'menu_focus')
             )
@@ -565,7 +561,11 @@ class UIManager:
         loop.set_alarm_in(1, update_callback)
 
         self.logger.info("Starting UI main loop with mouse/touchscreen support")
-        loop.run()
+        self.loop = loop
+        try:
+            loop.run()
+        finally:
+            self.loop = None
 
     def _handle_input(self, key):
         """
@@ -595,15 +595,12 @@ class UIManager:
             return
 
         # Vim-style navigation
-        if key in ('j', 'down'):
-            # Уже обрабатывается urwid
-            pass
-        elif key in ('k', 'up'):
-            pass
+        if key in ('j', 'k') and self.loop is not None:
+            self.loop.process_input(['down' if key == 'j' else 'up'])
         elif key in ('h', 'left', 'esc'):
             self.go_back()
-        elif key in ('l', 'right'):
-            pass
+        elif key in ('l', 'right') and self.loop is not None:
+            self.loop.process_input(['enter'])
 
         # Quit
         elif key == 'q':
@@ -613,47 +610,38 @@ class UIManager:
         elif key == '?':
             self._on_help(None)
 
-        # Command mode
-        elif key == ':':
-            # TODO: Implement command line
-            pass
+    def _run_action(self, callback):
+        try:
+            callback()
+        except ActionCancelled:
+            self.logger.info('Action cancelled')
+        except urwid.ExitMainLoop:
+            raise
+        except Exception as exc:
+            self.logger.exception('Module action failed')
+            self.show_message('Error', str(exc))
 
     def get_input(self, prompt: str, default: str = "") -> str:
-        """
-        Запросить ввод от пользователя.
-
-        Args:
-            prompt: Текст подсказки
-            default: Значение по умолчанию
-
-        Returns:
-            str: Введённое значение
-        """
-        # TODO: Implement input dialog
-        return default
+        """Return entered text; Esc/Cancel aborts the current action."""
+        return Dialog(prompt, default=default).run(self.loop, self.update_status_bar)
 
     def show_menu(self, title: str, items: List[str]) -> int:
-        """
-        Показать меню выбора.
-
-        Args:
-            title: Заголовок меню
-            items: Список пунктов
-
-        Returns:
-            int: Индекс выбранного пункта
-        """
-        # TODO: Implement selection menu
-        return 0
+        """Return an explicitly selected index; cancellation aborts the action."""
+        if not items:
+            raise ActionCancelled()
+        return Dialog(title, items=items).run(self.loop, self.update_status_bar)
 
     def show_progress(self, current: int, total: int, message: str = ""):
-        """
-        Показать прогресс-бар.
-
-        Args:
-            current: Текущее значение
-            total: Максимальное значение
-            message: Сообщение
-        """
-        # TODO: Implement progress bar
-        pass
+        """Render progress even while a synchronous module action is running."""
+        if total <= 0:
+            raise ValueError('Progress total must be positive')
+        if self._progress_view is None or self.frame.body is not self._progress_view:
+            self.view_stack.append(self.frame.body)
+        progress = urwid.ProgressBar('normal', 'menu_focus',
+                                    current=max(0, min(current, total)), done=total)
+        rows = [urwid.Text(message), urwid.Divider(), progress,
+                urwid.Button('Back', lambda _: self.go_back())]
+        self._progress_view = MouseScrollListBox(urwid.SimpleFocusListWalker(rows))
+        self.frame.body = self._progress_view
+        if self.loop is not None:
+            self.loop.draw_screen()

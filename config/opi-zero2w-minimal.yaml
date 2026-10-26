@@ -1,0 +1,21 @@
+# First TUI startup on a new image; no peripheral driver is loaded.
+# Select explicitly: ./cyberdeck --config opi-zero2w-minimal.yaml
+system:
+  device: orangepi_zero2w
+  log_level: INFO
+  log_path: logs/
+hardware:
+  battery:
+    enabled: false
+  thermal:
+    monitoring: true
+    zones: [cpu-thermal, gpu-thermal]
+modules:
+  paths: [modules]
+  autoload: [system]
+  priority_order: true
+network:
+  wifi:
+    interface: wlan0
+  lte:
+    enabled: false

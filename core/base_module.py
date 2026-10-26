@@ -35,6 +35,7 @@ class BaseModule(ABC):
         self.priority = priority
         self.enabled = True
         self.config = {}
+        self._subscriptions = []
         self.logger = self._setup_logger()
 
     def _setup_logger(self) -> logging.Logger:
@@ -115,17 +116,18 @@ class BaseModule(ABC):
 
     # ========== UI Helper методы ==========
 
-    def show_message(self, message: str, title: str = "Info"):
-        """
-        Показать информационное сообщение.
+    def show_message(self, message: str, body: Optional[str] = None, *, title: str = None):
+        """Show text with an optional title.
 
-        Args:
-            message: Текст сообщения
-            title: Заголовок окна
+        Accept both show_message(text, title='Title') and the form used by
+        built-in modules, show_message('Title', text). A single argument is text.
         """
-        # Реализуется UI менеджером
         from core.ui_manager import UIManager
-        UIManager.get_instance().show_message(title, message)
+        if body is not None:
+            heading, text = message, body
+        else:
+            heading, text = title or 'Info', message
+        UIManager.get_instance().show_message(heading, text)
 
     def show_error(self, message: str):
         """
@@ -145,7 +147,7 @@ class BaseModule(ABC):
             default: Значение по умолчанию
 
         Returns:
-            str: Введённое значение
+            str: Введённое значение. Отмена прерывает текущее действие.
         """
         from core.ui_manager import UIManager
         return UIManager.get_instance().get_input(prompt, default)
@@ -159,7 +161,7 @@ class BaseModule(ABC):
             items: Список пунктов
 
         Returns:
-            int: Индекс выбранного пункта (-1 если отмена)
+            int: Индекс выбранного пункта. Отмена прерывает текущее действие.
         """
         from core.ui_manager import UIManager
         return UIManager.get_instance().show_menu(title, items)
@@ -297,6 +299,7 @@ class BaseModule(ABC):
         """
         from core.event_bus import EventBus
         EventBus.get_instance().subscribe(event_name, callback)
+        self._subscriptions.append((event_name, callback))
 
     def emit_event(self, event_name: str, data: Dict[str, Any]):
         """
@@ -308,3 +311,10 @@ class BaseModule(ABC):
         """
         from core.event_bus import EventBus
         EventBus.get_instance().emit(event_name, data)
+
+    def release_subscriptions(self):
+        """Called by ModuleLoader even if a module's on_unload fails."""
+        from core.event_bus import EventBus
+        for event, callback in self._subscriptions:
+            EventBus.get_instance().unsubscribe(event, callback)
+        self._subscriptions.clear()

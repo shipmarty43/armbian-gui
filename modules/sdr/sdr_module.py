@@ -4,6 +4,7 @@ Support for HackRF One and RTL-SDR
 """
 
 from core.base_module import BaseModule
+from core.resources import sdr_stream
 from typing import List, Tuple, Callable, Optional
 import os
 import time
@@ -137,43 +138,37 @@ class SDRModule(BaseModule):
             self.sdr.setGain(SOAPY_SDR_RX, 0, self.gain)
             
             # Create stream
-            rxStream = self.sdr.setupStream(SOAPY_SDR_RX, SOAPY_SDR_CF32)
-            self.sdr.activateStream(rxStream)
-            
-            # Receive samples
-            buff = np.array([0]*1024, np.complex64)
-            sr = self.sdr.readStream(rxStream, [buff], len(buff))
-            
-            if sr.ret > 0:
-                # Compute FFT
-                fft = np.fft.fft(buff)
-                fft_shifted = np.fft.fftshift(fft)
-                magnitude = np.abs(fft_shifted)
-                magnitude_db = 20 * np.log10(magnitude + 1e-10)
-                
-                # Find peak
-                peak_idx = np.argmax(magnitude_db)
-                peak_db = magnitude_db[peak_idx]
-                
-                # Simple ASCII spectrum
-                spectrum_text = f"Spectrum Analyzer\n\n"
-                spectrum_text += f"Center: {self.center_freq/1e6:.2f}MHz\n"
-                spectrum_text += f"Sample Rate: {self.sample_rate/1e6:.2f}MHz\n"
-                spectrum_text += f"Gain: {self.gain}dB\n\n"
-                spectrum_text += f"Peak: {peak_db:.1f}dBFS\n\n"
-                
-                # Simple bar chart
-                for i in range(0, len(magnitude_db), 20):
-                    level = int(magnitude_db[i] + 100)  # Scale to 0-100
-                    bars = '█' * max(0, min(level, 50))
-                    spectrum_text += f"{bars}\n"
-                
-                self.show_message("Spectrum Analyzer", spectrum_text)
-            
-            # Cleanup
-            self.sdr.deactivateStream(rxStream)
-            self.sdr.closeStream(rxStream)
-            
+            with sdr_stream(self.sdr, SOAPY_SDR_RX, SOAPY_SDR_CF32) as rxStream:
+                # Receive samples
+                buff = np.array([0]*1024, np.complex64)
+                sr = self.sdr.readStream(rxStream, [buff], len(buff))
+
+                if sr.ret > 0:
+                    # Compute FFT
+                    fft = np.fft.fft(buff)
+                    fft_shifted = np.fft.fftshift(fft)
+                    magnitude = np.abs(fft_shifted)
+                    magnitude_db = 20 * np.log10(magnitude + 1e-10)
+
+                    # Find peak
+                    peak_idx = np.argmax(magnitude_db)
+                    peak_db = magnitude_db[peak_idx]
+
+                    # Simple ASCII spectrum
+                    spectrum_text = f"Spectrum Analyzer\n\n"
+                    spectrum_text += f"Center: {self.center_freq/1e6:.2f}MHz\n"
+                    spectrum_text += f"Sample Rate: {self.sample_rate/1e6:.2f}MHz\n"
+                    spectrum_text += f"Gain: {self.gain}dB\n\n"
+                    spectrum_text += f"Peak: {peak_db:.1f}dBFS\n\n"
+
+                    # Simple bar chart
+                    for i in range(0, len(magnitude_db), 20):
+                        level = int(magnitude_db[i] + 100)  # Scale to 0-100
+                        bars = '█' * max(0, min(level, 50))
+                        spectrum_text += f"{bars}\n"
+
+                    self.show_message("Spectrum Analyzer", spectrum_text)
+
         except Exception as e:
             self.show_error(f"Spectrum analyzer error: {e}")
     
@@ -216,32 +211,27 @@ class SDRModule(BaseModule):
             self.sdr.setGain(SOAPY_SDR_RX, 0, self.gain)
             
             # Create stream
-            rxStream = self.sdr.setupStream(SOAPY_SDR_RX, SOAPY_SDR_CF32)
-            self.sdr.activateStream(rxStream)
-            
-            # Record
-            samples_to_read = int(self.sample_rate * duration)
-            all_samples = []
-            
-            self.show_message("Recording", f"Recording {duration}s...\nPlease wait.")
-            
-            while len(all_samples) < samples_to_read:
-                buff = np.array([0]*4096, np.complex64)
-                sr = self.sdr.readStream(rxStream, [buff], len(buff))
-                
-                if sr.ret > 0:
+            with sdr_stream(self.sdr, SOAPY_SDR_RX, SOAPY_SDR_CF32) as rxStream:
+                # Record
+                samples_to_read = int(self.sample_rate * duration)
+                all_samples = []
+
+                self.show_message("Recording", f"Recording {duration}s...\nPlease wait.")
+
+                while len(all_samples) < samples_to_read:
+                    buff = np.array([0]*4096, np.complex64)
+                    sr = self.sdr.readStream(rxStream, [buff], len(buff))
+
+                    if sr.ret <= 0:
+                        raise RuntimeError(f"SDR read failed or timed out: {sr.ret}")
                     all_samples.extend(buff[:sr.ret])
-            
-            # Save to file
-            filename = f"iq_{int(self.center_freq/1e6)}MHz_{int(time.time())}.npy"
-            filepath = os.path.join(self.samples_dir, filename)
-            
-            np.save(filepath, np.array(all_samples))
-            
-            # Cleanup
-            self.sdr.deactivateStream(rxStream)
-            self.sdr.closeStream(rxStream)
-            
+
+                # Save to file
+                filename = f"iq_{int(self.center_freq/1e6)}MHz_{int(time.time())}.npy"
+                filepath = os.path.join(self.samples_dir, filename)
+
+                np.save(filepath, np.array(all_samples))
+
             self.show_message(
                 "Recording Complete",
                 f"IQ samples saved!\n\n"

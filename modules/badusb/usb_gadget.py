@@ -3,6 +3,7 @@ USB Gadget Controller - управление USB Gadget для BadUSB
 """
 
 import os
+import re
 import time
 import logging
 from typing import Optional, Dict, List
@@ -83,6 +84,9 @@ class USBGadgetController:
             gadget_name: Name of USB gadget
         """
         self.logger = logging.getLogger("cyberdeck.badusb")
+        if not re.fullmatch(r'[A-Za-z0-9_-]+', gadget_name):
+            raise ValueError('Invalid gadget name')
+        self._owned = False
         self.gadget_name = gadget_name
         self.gadget_path = f"/sys/kernel/config/usb_gadget/{gadget_name}"
         self.hid_dev = None
@@ -110,7 +114,8 @@ class USBGadgetController:
                 return False
 
             # Create gadget directory
-            os.makedirs(self.gadget_path, exist_ok=True)
+            os.makedirs(self.gadget_path, exist_ok=False)
+            self._owned = True
 
             # Set USB device descriptor
             self._write_file(f"{self.gadget_path}/idVendor", vendor_id)
@@ -177,6 +182,10 @@ class USBGadgetController:
         except Exception as e:
             self.logger.error(f"Failed to setup USB Gadget: {e}")
             return False
+
+        finally:
+            if not self.enabled:
+                self.cleanup()
 
     def _write_file(self, path: str, content: str):
         """Write content to file"""
@@ -267,34 +276,39 @@ class USBGadgetController:
         return True
 
     def cleanup(self) -> bool:
+        """Remove only the configfs gadget created by this instance.
+
+        Configfs attributes are kernel-owned files. Remove user-created links
+        and directories in reverse dependency order, never shutil.rmtree().
         """
-        Cleanup USB Gadget.
-
-        Returns:
-            bool: True if successful
-        """
-        try:
-            if os.path.exists(self.gadget_path):
-                # Disable gadget
-                udc_file = f"{self.gadget_path}/UDC"
-                if os.path.exists(udc_file):
-                    self._write_file(udc_file, "")
-
-                # Remove symlinks
-                config_path = f"{self.gadget_path}/configs/c.1"
-                func_link = f"{config_path}/hid.usb0"
-                if os.path.exists(func_link):
-                    os.unlink(func_link)
-
-                # Remove directories (in reverse order)
-                import shutil
-                if os.path.exists(self.gadget_path):
-                    shutil.rmtree(self.gadget_path)
-
-            self.enabled = False
-            self.logger.info("USB Gadget cleaned up")
+        if not self._owned:
             return True
-
-        except Exception as e:
-            self.logger.error(f"Failed to cleanup USB Gadget: {e}")
+        self.enabled = False
+        self.hid_dev = None
+        try:
+            udc = f'{self.gadget_path}/UDC'
+            if os.path.exists(udc):
+                self._write_file(udc, '')
+        except Exception:
+            self.logger.exception('Cannot unbind owned USB gadget')
             return False
+        ok = True
+        link = f'{self.gadget_path}/configs/c.1/hid.usb0'
+        try:
+            if os.path.islink(link):
+                os.unlink(link)
+        except Exception:
+            self.logger.exception('Cannot remove owned gadget function link')
+            ok = False
+        for suffix in ('configs/c.1/strings/0x409', 'configs/c.1',
+                       'functions/hid.usb0', 'strings/0x409', ''):
+            path = os.path.join(self.gadget_path, suffix) if suffix else self.gadget_path
+            try:
+                if os.path.exists(path):
+                    os.rmdir(path)
+            except Exception:
+                self.logger.exception('Cannot remove owned configfs directory %s', path)
+                ok = False
+        if ok:
+            self._owned = False
+        return ok

@@ -50,12 +50,30 @@ class ConfigLoader:
                     config = {}
                 if not isinstance(config, dict):
                     raise ValueError("Configuration must be a YAML mapping")
+                self._check_structure(config)
                 self.configs[filename] = config
                 self.logger.info(f"Loaded config: {filename}")
                 return config
         except Exception as e:
             self.logger.error(f"Failed to load config {filename}: {e}")
             return {}
+
+    @staticmethod
+    def _check_structure(config):
+        for name in ('system', 'hardware', 'network', 'modules', 'ui',
+                     'wifi', 'bluetooth', 'sdr', 'badusb'):
+            if name in config and not isinstance(config[name], dict):
+                raise ValueError(f'{name} must be a mapping')
+        for parent in ('hardware', 'network'):
+            for name, section in config.get(parent, {}).items():
+                if not isinstance(section, dict):
+                    raise ValueError(f'{parent}.{name} must be a mapping')
+        modules = config.get('modules', {})
+        for key in ('autoload', 'paths'):
+            values = modules.get(key)
+            if values is not None and (not isinstance(values, list) or
+                                       any(not isinstance(item, str) for item in values)):
+                raise ValueError(f'modules.{key} must be a list of strings')
 
     def save(self, filename: str, config: Dict[str, Any]):
         """
