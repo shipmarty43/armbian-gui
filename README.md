@@ -4,6 +4,10 @@
 
 A modular, terminal-based interface for wireless protocol research, NFC/RFID analysis, SDR experimentation, and WiFi security testing.
 
+**License notice:** This revision uses a [custom license](LICENSE) that does not
+grant permission to run, execute, or use the software, even for lawful purposes.
+The technical installation and usage examples below do not grant such permission.
+
 ---
 
 ## 🚀 Features
@@ -365,7 +369,19 @@ Contributions welcome! Please:
 
 ## 📜 License
 
-MIT License (see LICENSE file)
+[armbian-gui Custom License — No Execution or Use](LICENSE).
+
+Copyright (c) 2025-2026 shipmarty43. This is a custom source-available license,
+not the MIT License or GPL. It allows copying, modification and redistribution
+subject to its terms, but does not grant permission to run, execute or use the
+software or binaries. It also prohibits dealing in the project in connection
+with acts that violate applicable local law.
+
+The author describes the project as a hobby and educational toy for a narrow
+circle of specialists, not as malware or equipment for covert acquisition of
+information. This statement is not a legal classification or an exception to
+the no-use restriction. Third-party licenses and rights already granted for
+earlier copies remain unaffected. See [LICENSE](LICENSE) for the complete terms.
 
 ---
 
