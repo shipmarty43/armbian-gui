@@ -1,0 +1,79 @@
+--- original/spidev_spi1_cs0_cs1.dts
++++ opi-zero2w-spi1-cs0-cs1.dts
+@@ -1,42 +1,41 @@
+ /dts-v1/;
++/plugin/;
+ 
++/*
++ * Candidate replacement for spidev_spi1_cs0_cs1.dtbo on the audited
++ * Orange Pi Zero 2W DTB (6.12.47-current-sunxi64).
++ * Explicitly mux both native CS pins; the base DT only selects CS1.
++ * Offline merge verified. Physical wiring and transfers are not verified.
++ * This provides logical CS0/CS1 only; it does not provide PN532's CS2.
++ * Use instead of the old overlay, not together with other SPI1 overlays.
++ */
+ / {
+-	compatible = "allwinner,sun50i-h616";
++    compatible = "xunlong,orangepi-zero2w", "allwinner,sun50i-h618";
+ 
+-	fragment@0 {
+-		target = <0xffffffff>;
++    fragment@0 {
++        target = <&spi1>;
++        __overlay__ {
++            #address-cells = <1>;
++            #size-cells = <0>;
++            status = "okay";
++            pinctrl-names = "default";
++            pinctrl-0 = <&spi1_pins &spi1_cs0_pin &spi1_cs1_pin>;
++            cs-gpios = <0>, <0>;
++            num-cs = <2>;
+ 
+-		__overlay__ {
+-			#address-cells = <0x01>;
+-			#size-cells = <0x00>;
+-			cs-gpios = <0x00 0x00>;
+-			num-cs = <0x02>;
+-			status = "okay";
++            spidev@0 {
++                compatible = "rohm,dh2228fv";
++                reg = <0>;
++                spi-max-frequency = <40000000>;
++                status = "okay";
++            };
+ 
+-			spidev@0 {
+-				compatible = "rohm,dh2228fv";
+-				reg = <0x00>;
+-				spi-max-frequency = <0x2625a00>;
+-				status = "okay";
+-				phandle = <0x01>;
+-			};
+-
+-			spidev@1 {
+-				compatible = "rohm,dh2228fv";
+-				reg = <0x01>;
+-				spi-max-frequency = <0x2625a00>;
+-				status = "okay";
+-				phandle = <0x02>;
+-			};
+-		};
+-	};
+-
+-	__symbols__ {
+-		spidev0 = "/fragment@0/__overlay__/spidev@0";
+-		spidev1 = "/fragment@0/__overlay__/spidev@1";
+-	};
+-
+-	__fixups__ {
+-		spi1 = "/fragment@0:target:0";
+-	};
++            spidev@1 {
++                compatible = "rohm,dh2228fv";
++                reg = <1>;
++                spi-max-frequency = <40000000>;
++                status = "okay";
++            };
++        };
++    };
+ };

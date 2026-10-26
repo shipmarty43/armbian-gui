@@ -1,0 +1,44 @@
+/dts-v1/;
+
+/ {
+
+	fragment@0 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			dr_mode = "host";
+			status = "okay";
+		};
+	};
+
+	fragment@1 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@2 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	fragment@3 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			status = "okay";
+		};
+	};
+
+	__fixups__ {
+		usbotg = "/fragment@0:target:0";
+		usbphy = "/fragment@1:target:0";
+		ehci0 = "/fragment@2:target:0";
+		ohci0 = "/fragment@3:target:0";
+	};
+};

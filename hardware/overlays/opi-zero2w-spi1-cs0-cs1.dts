@@ -1,0 +1,41 @@
+/dts-v1/;
+/plugin/;
+
+/*
+ * Candidate replacement for spidev_spi1_cs0_cs1.dtbo on the audited
+ * Orange Pi Zero 2W DTB (6.12.47-current-sunxi64).
+ * Explicitly mux both native CS pins; the base DT only selects CS1.
+ * Offline merge verified. Physical wiring and transfers are not verified.
+ * This provides logical CS0/CS1 only; it does not provide PN532's CS2.
+ * Use instead of the old overlay, not together with other SPI1 overlays.
+ */
+/ {
+    compatible = "xunlong,orangepi-zero2w", "allwinner,sun50i-h618";
+
+    fragment@0 {
+        target = <&spi1>;
+        __overlay__ {
+            #address-cells = <1>;
+            #size-cells = <0>;
+            status = "okay";
+            pinctrl-names = "default";
+            pinctrl-0 = <&spi1_pins &spi1_cs0_pin &spi1_cs1_pin>;
+            cs-gpios = <0>, <0>;
+            num-cs = <2>;
+
+            spidev@0 {
+                compatible = "rohm,dh2228fv";
+                reg = <0>;
+                spi-max-frequency = <40000000>;
+                status = "okay";
+            };
+
+            spidev@1 {
+                compatible = "rohm,dh2228fv";
+                reg = <1>;
+                spi-max-frequency = <40000000>;
+                status = "okay";
+            };
+        };
+    };
+};

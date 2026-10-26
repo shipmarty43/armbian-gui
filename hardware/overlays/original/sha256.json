@@ -1,0 +1,10 @@
+{
+  "spidev_spi1_cs0_cs1.dtbo": "3c2eafaa6656680f10133da299fc690d068792e3791bdaf666298e044f61e612",
+  "spidev_spi1_cs0_cs1.dts": "bfa2ba38b12f3ee76c443d1d6e87836565995d1dc93ed33f9d9a73ebd7e440b8",
+  "spidev_spi1_cs2_pi3_cs3_pi4.dtbo": "ea3d1400c07b49198e2e8626eae0437a939871861756628a08eeaeaed963c5d3",
+  "spidev_spi1_cs2_pi3_cs3_pi4.dts": "eb5935a42328c3cc3be8a7f84f8887a1345b327c1864ea2155deea5bed125230",
+  "spidev_spi1_cs4_pi3.dtbo": "85a74cb8c6ea16acaa0f9d4fc1fd30fefbe3529b6bf3d6027697730eb821fbfd",
+  "spidev_spi1_cs4_pi3.dts": "7bb942f2c728c5412ce92074b3cf0e5c6c3921d1ba59c0f433e2e62eec3f6b09",
+  "sun50i-h616-usb0-host.dtbo": "c6aea1cf15a0da3fe0d63aefd3aa8df2017b22ca1b9e4277e3c604b127e7d557",
+  "sun50i-h616-usb0-host.dts": "cb911733cc4f6b688e0f100046e579a4de228ebb95dde7aef4e8cf6e1ceb5056"
+}

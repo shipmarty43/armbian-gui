@@ -1,0 +1,79 @@
+/dts-v1/;
+
+/ {
+	compatible = "allwinner,sun50i-h616";
+
+	fragment@0 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+
+			spi1-cs2-pi3 {
+				pins = "PI3";
+				function = "gpio_out";
+				drive-strength = <0x14>;
+				bias-pull-up;
+				phandle = <0x01>;
+			};
+
+			spi1-cs3-pi4 {
+				pins = "PI4";
+				function = "gpio_out";
+				drive-strength = <0x14>;
+				bias-pull-up;
+				phandle = <0x02>;
+			};
+		};
+	};
+
+	fragment@1 {
+		target = <0xffffffff>;
+
+		__overlay__ {
+			pinctrl-names = "default";
+			pinctrl-0 = <0xffffffff 0x01 0x02>;
+			cs-gpios = <0xffffffff 0x08 0x03 0x00 0xffffffff 0x08 0x04 0x00>;
+			num-cs = <0x02>;
+			status = "okay";
+
+			spidev@2 {
+				compatible = "rohm,dh2228fv";
+				reg = <0x00>;
+				spi-max-frequency = <0x989680>;
+				status = "okay";
+				phandle = <0x03>;
+			};
+
+			spidev@3 {
+				compatible = "rohm,dh2228fv";
+				reg = <0x01>;
+				spi-max-frequency = <0x989680>;
+				status = "okay";
+				phandle = <0x04>;
+			};
+		};
+	};
+
+	__symbols__ {
+		spi1_cs2_pi3 = "/fragment@0/__overlay__/spi1-cs2-pi3";
+		spi1_cs3_pi4 = "/fragment@0/__overlay__/spi1-cs3-pi4";
+		spidev2 = "/fragment@1/__overlay__/spidev@2";
+		spidev3 = "/fragment@1/__overlay__/spidev@3";
+	};
+
+	__fixups__ {
+		pio = "/fragment@0:target:0", "/fragment@1/__overlay__:cs-gpios:0", "/fragment@1/__overlay__:cs-gpios:16";
+		spi1 = "/fragment@1:target:0";
+		spi1_pins = "/fragment@1/__overlay__:pinctrl-0:0";
+	};
+
+	__local_fixups__ {
+
+		fragment@1 {
+
+			__overlay__ {
+				pinctrl-0 = <0x04 0x08>;
+			};
+		};
+	};
+};
