@@ -218,7 +218,7 @@ class SystemModule(BaseModule):
         - Modular architecture
         - Vim-style interface
 
-        License: MIT / GPLv3
+        License: Custom — No Execution or Use (see LICENSE)
         """
 
         self.show_message("About CyberDeck Interface", about_text)
