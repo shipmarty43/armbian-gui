@@ -59,20 +59,37 @@ validate one physically connected peripheral at a time in a copied profile.
 
 ## Not yet established on hardware
 
+### Booted-board validation, 2026-10-26
+
+The fresh image has now booted on the user's Orange Pi Zero 2W. On Python 3.14.4,
+all 81 tests passed natively. The minimal profile passed `--check-config`.
+A real PTY exercised text entry and selection dialogs; a separate full application
+run rendered the System Tools menu, remained active for status updates and exited
+with code 0 on `q`. Headless startup exited with code 0 on SIGINT, logging shutdown
+and module unload. Only the system module was enabled; battery and peripheral
+drivers were not initialized. This does not validate a physical touchscreen.
+
+`CpuPowerManager.policies()` read the live `cpufreq-dt` policy successfully:
+480–1416 MHz, governor `ondemand`, with `conservative`, `ondemand`, `userspace`,
+`powersave`, `performance`, and `schedutil` available. No policy writes were made.
+Linux I2C adapter 0 is the R-I2C controller at `7081400`; adapter 1 is DesignWare
+HDMI. No spidev nodes were present. These are discovery results, not verified
+external-module wiring; do not reuse the old image's adapter numbers blindly.
+
 | Component | Current evidence / remaining limitation |
 |---|---|
-| Orange Pi Zero 2W | New SD inspected offline: Armbian community 26.11.0-trunk.108, Ubuntu 26.04, kernel 6.18.57-current-sunxi64. Image has not completed first boot. |
+| Orange Pi Zero 2W | Booted Armbian community 26.11.0-trunk.108 / Ubuntu 26.04 / kernel 6.18.57-current-sunxi64. Native test suite and minimal application startup/shutdown passed. |
 | DFR0528 UPS | MCU identity/sample parsing and stale-data logic tested with fixtures; physical I2C adapter and readings need confirmation. No automatic shutdown. |
-| CPU power | Reads kernel cpufreq policies; writes checked with fixtures. Governors/frequencies on the new board image need a runtime check. |
+| CPU power | Live policy/governor/frequency discovery passed; writes remain fixture-tested only. |
 | CC1101 | SPI/FIFO driver exists; arbitrary pulse/RAW capture, protocol decoding, replay fidelity and Flipper compatibility are not established. |
 | PN532 | Resource lifecycle covered; I2C framing/readiness and supported card operations require protocol and device tests. |
 | nRF24 | Resource lifecycle covered; radio scans, CE timing and measurements unverified. |
 | SX1262 / mesh | Initialization cleanup covered; GPIO numbering and hardware setup require checks. Meshtastic interoperability is not established by the local implementation. |
 | GPS | NMEA parser fixtures pass; UART adapter, live fixes and exports need board tests. |
 | SDR / Bluetooth / WiFi / USB gadget | Optional dependencies and menu code exist. End-to-end device operations have not been validated in this work. |
-| TUI / Web UI | TUI dialogs tested with urwid widgets and fake screens, including a mouse click. Touchscreen hardware untested. Web UI authentication and demo behavior are separate outstanding work. |
+| TUI / Web UI | Widget tests and native-board PTY input, selection, main menu and clean exit passed. Physical touchscreen untested. Web UI authentication and demo behavior are separate outstanding work. |
 
-No RF transmission, GPIO electrical test, real card emulation, gadget action or
-successful first boot is claimed by these tests. Tasks concerning protocol
+No RF transmission, GPIO electrical test, real card emulation or gadget action
+is claimed by these tests. Tasks concerning protocol
 correctness, Web UI and full hardware acceptance remain separate from this
 lifecycle/configuration/UI work.

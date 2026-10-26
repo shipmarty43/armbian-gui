@@ -415,29 +415,23 @@ earlier copies remain unaffected. See [LICENSE](LICENSE) for the complete terms.
 
 ## 🗺️ Roadmap
 
-### v3.0 (Released - Current Stable)
-- ✅ Core architecture with event bus
-- ✅ Modular plugin system
-- ✅ Full mouse and touchscreen support
-- ✅ System monitors (battery, thermal, network)
-- ✅ Root user support for hardware access
-- ✅ Python 3.11+ with venv (no conda required)
-- ✅ Hardware config: nRF24L01+ and CC1101 on shared SPI
+### Verified foundation
+- Core event bus, module configuration and scoped resource cleanup
+- Keyboard/mouse widget tests; native Orange Pi terminal input and selection
+- Minimal-profile startup and clean exit on Python 3.14.4 / kernel 6.18.57
+- Live CPUFreq discovery; battery and CPU policy write tests use fixtures
 
-### v3.1 (Released - Hardware Integration Complete)
-- ✅ Full CC1101 hardware integration (Sub-GHz TX/RX)
-- ✅ PN532 NFC/RFID driver (I2C/SPI)
-- ✅ LoRa mesh networking (Meshtastic + Reticulum)
-- ✅ SX1262 LoRa driver for Waveshare HAT
-- ✅ GPS wardriving with NMEA parser
-- ✅ SDR support (HackRF One + RTL-SDR via SoapySDR)
+### Hardware and integration work still pending
+- Physical touchscreen and DFR0528 readings
+- Verified GPIO backend for Python drivers and conflict-free peripheral wiring
+- CC1101, PN532, nRF24 and SX1262 protocol/device acceptance
+- Meshtastic/Reticulum interoperability and live GPS fixes
+- SDR device validation and Web UI authentication/API review
+- Bluetooth terminal control, CAN Bus and ML signal classification
 
-### v4.0 (Released - Advanced Features)
-- ✅ Web UI (Flask-based remote access)
-- ✅ Real-time API for all modules
-- 🔲 Bluetooth terminal control (framework ready)
-- 🔲 CAN Bus support (framework ready)
-- 🔲 ML signal classification (framework ready)
+The previous “Current Stable / Hardware Integration Complete” labels were not
+supported by device tests. See [IMPLEMENTATION_STATUS.md](IMPLEMENTATION_STATUS.md)
+for the distinction between implemented code, fixture tests and board evidence.
 
 ### v4.1 (Planned)
 - 🔲 Protocol decoders (Princeton, Came, Nice, KeeLoq)
@@ -449,4 +443,4 @@ earlier copies remain unaffected. See [LICENSE](LICENSE) for the complete terms.
 
 **Built with ❤️ for the security research community**
 
-*Last updated: 2025-11-18 | Version 3.0*
+*Verification status updated: 2026-10-26 | Experimental project*
