@@ -46,6 +46,10 @@ class ConfigLoader:
         try:
             with open(filepath, 'r', encoding='utf-8') as f:
                 config = yaml.safe_load(f)
+                if config is None:
+                    config = {}
+                if not isinstance(config, dict):
+                    raise ValueError("Configuration must be a YAML mapping")
                 self.configs[filename] = config
                 self.logger.info(f"Loaded config: {filename}")
                 return config

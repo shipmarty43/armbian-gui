@@ -54,7 +54,7 @@ class NFCModule(BaseModule):
         self.log_info("NFC module loading...")
 
         # Load configuration
-        config = self.load_config("config/main.yaml")
+        config = self.get_config()
         nfc_config = config.get('hardware', {}).get('nfc', {})
 
         if not nfc_config.get('enabled', False):

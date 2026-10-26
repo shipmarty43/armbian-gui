@@ -71,7 +71,7 @@ class LoRaModule(BaseModule):
         self.log_info("LoRa Mesh module loading...")
         
         # Load config
-        config = self.get_config().get('lora', {})
+        config = self.get_config().get('hardware', {}).get('lora', {})
         
         if not config.get('enabled', False):
             self.log_info("LoRa disabled in config")
@@ -106,7 +106,7 @@ class LoRaModule(BaseModule):
 
                             # Configure LoRa for Meshtastic
                             mesh_config = get_meshtastic_lora_config()
-                            self.sx1262.set_frequency(mesh_config['frequency'])
+                            self.sx1262.set_rf_frequency(mesh_config['frequency'])
                             self.sx1262.spreading_factor = mesh_config['spreading_factor']
                             self.sx1262.bandwidth = mesh_config['bandwidth']
                             self.sx1262.tx_power = mesh_config['tx_power']
@@ -364,7 +364,7 @@ class LoRaModule(BaseModule):
             self.mode = "direct"
             # Restore direct LoRa settings
             if self.sx1262:
-                self.sx1262.set_frequency(433920000)  # 433.92 MHz
+                self.sx1262.set_rf_frequency(433920000)  # 433.92 MHz
                 self.sx1262.spreading_factor = 7
                 self.sx1262.tx_power = 22
             self.show_message("Mode", "Mode: Direct LoRa\n\nLoRa configured for direct TX/RX")
@@ -373,7 +373,7 @@ class LoRaModule(BaseModule):
             # Configure for Meshtastic
             if self.sx1262:
                 mesh_config = get_meshtastic_lora_config()
-                self.sx1262.set_frequency(mesh_config['frequency'])
+                self.sx1262.set_rf_frequency(mesh_config['frequency'])
                 self.sx1262.spreading_factor = mesh_config['spreading_factor']
             self.show_message("Mode", f"Mode: Meshtastic Mesh\n\nNode: 0x{self.meshtastic.node_id:08X}\n\nLoRa configured for mesh networking")
         elif idx == 2 and RETICULUM_AVAILABLE:

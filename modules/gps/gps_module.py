@@ -64,7 +64,7 @@ class GPSModule(BaseModule):
             return
             
         try:
-            port = config.get('uart_port', '/dev/ttyS1')
+            port = config.get('device', config.get('uart_port', '/dev/ttyS1'))
             baudrate = config.get('baudrate', 9600)
             
             self.gps = GPSReader(port=port, baudrate=baudrate)

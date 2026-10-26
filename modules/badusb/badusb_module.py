@@ -40,7 +40,7 @@ class BadUSBModule(BaseModule):
         self.log_info("BadUSB module loading...")
 
         # Load configuration
-        config = self.load_config("config/main.yaml")
+        config = self.get_config()
         badusb_config = config.get('badusb', {})
 
         if not badusb_config.get('enabled', False):
@@ -121,7 +121,7 @@ class BadUSBModule(BaseModule):
 
     def _enable_gadget(self):
         """Enable USB Gadget HID keyboard"""
-        config = self.load_config("config/main.yaml")
+        config = self.get_config()
         gadget_config = config.get('badusb', {}).get('usb_gadget', {})
 
         vendor_id = gadget_config.get('vendor_id', '0x1d6b')

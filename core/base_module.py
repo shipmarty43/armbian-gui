@@ -196,6 +196,10 @@ class BaseModule(ABC):
 
     # ========== Конфигурация ==========
 
+    def get_config(self) -> Dict[str, Any]:
+        """Return application configuration supplied before on_load()."""
+        return self.config
+
     def load_config(self, config_path: str) -> Dict[str, Any]:
         """
         Загрузить YAML конфиг.

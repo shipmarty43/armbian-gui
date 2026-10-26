@@ -36,7 +36,7 @@ class NRF24Module(BaseModule):
         self.log_info("nRF24 module loading...")
 
         # Load configuration
-        config = self.load_config("config/main.yaml")
+        config = self.get_config()
         nrf24_config = config.get('hardware', {}).get('nrf24', {})
 
         if not nrf24_config.get('enabled', False):

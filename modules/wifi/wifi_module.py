@@ -39,7 +39,7 @@ class WiFiModule(BaseModule):
         self.log_info("WiFi module loading...")
 
         # Load configuration
-        config = self.load_config("config/main.yaml")
+        config = self.get_config()
         wifi_config = config.get('wifi', {})
 
         # Initialize hcxtools wrapper

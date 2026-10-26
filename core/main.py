@@ -98,7 +98,7 @@ def main():
 
     # Thermal Monitor
     if config.get('hardware', {}).get('thermal', {}).get('monitoring', True):
-        thermal_config = config['hardware']['thermal']
+        thermal_config = config.get('hardware', {}).get('thermal', {})
         thermal_monitor = ThermalMonitor(
             zones=thermal_config.get('zones', ['cpu-thermal']),
             poll_interval=thermal_config.get('poll_interval', 2),
@@ -121,11 +121,13 @@ def main():
 
     # 4. Загрузка модулей
     module_paths = config.get('modules', {}).get('paths', ['modules'])
-    autoload_modules = config.get('modules', {}).get('autoload', [])
+    autoload_modules = config.get('modules', {}).get('autoload')
     priority_order = config.get('modules', {}).get('priority_order', True)
 
     module_loader = ModuleLoader.get_instance(module_paths)
-    loaded_modules = module_loader.load_all_modules(priority_order=priority_order)
+    loaded_modules = module_loader.load_all_modules(
+        priority_order=priority_order, module_names=autoload_modules, config=config
+    )
 
     logger.info(f"Loaded {len(loaded_modules)} modules")
     for module in loaded_modules:

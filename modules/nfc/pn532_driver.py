@@ -138,8 +138,8 @@ class PN532:
 
         elif interface == 'i2c':
             try:
-                import smbus
-                self.i2c = smbus.SMBus(i2c_bus)
+                from smbus2 import SMBus
+                self.i2c = SMBus(i2c_bus)
                 self.i2c_address = i2c_address
                 self.logger.info(f"PN532 I2C opened: bus {i2c_bus}, addr 0x{i2c_address:02X}")
             except Exception as e:

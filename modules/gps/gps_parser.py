@@ -6,7 +6,7 @@ Parses NMEA sentences from GPS modules (UART/Serial)
 import time
 import logging
 import serial
-from typing import Optional, Dict
+from typing import Optional, Dict, Tuple
 from datetime import datetime
 
 

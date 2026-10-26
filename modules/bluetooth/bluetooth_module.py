@@ -42,7 +42,7 @@ class BluetoothModule(BaseModule):
         self.log_info("Bluetooth module loading...")
 
         # Load configuration
-        config = self.load_config("config/main.yaml")
+        config = self.get_config()
         bt_config = config.get('bluetooth', {})
 
         if not bt_config.get('enabled', False):

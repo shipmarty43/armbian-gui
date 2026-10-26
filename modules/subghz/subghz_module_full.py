@@ -55,7 +55,7 @@ class SubGHzModuleFull(BaseModule):
             return
 
         # Load configuration
-        config = self.load_config("config/main.yaml")
+        config = self.get_config()
         subghz_config = config.get('hardware', {}).get('subghz', {})
 
         if not subghz_config.get('enabled', False):

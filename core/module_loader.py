@@ -112,39 +112,50 @@ class ModuleLoader:
             self.logger.error(f"Failed to load module {module_name}: {e}")
             return None
 
-    def load_all_modules(self, priority_order: bool = True) -> List[BaseModule]:
+    def load_all_modules(self, priority_order: bool = True,
+                         module_names: Optional[List[str]] = None,
+                         config: Optional[Dict] = None) -> List[BaseModule]:
         """
         Загрузить все обнаруженные модули.
 
         Args:
             priority_order: Сортировать по приоритету (1 = highest)
+            module_names: None discovers all; an empty list loads none.
+            config: Application configuration supplied before on_load.
 
         Returns:
             List[BaseModule]: Список загруженных модулей
         """
-        discovered = self.discover_modules()
+        discovered = (self.discover_modules() if module_names is None
+                      else list(dict.fromkeys(module_names)))
         loaded = []
 
         for module_name in discovered:
             module = self.load_module(module_name)
             if module:
                 loaded.append(module)
-                self.modules[module.name] = module
-
-                # Вызываем on_load
-                try:
-                    module.on_load()
-                except Exception as e:
-                    self.logger.error(
-                        f"Error in {module.name}.on_load(): {e}"
-                    )
+                module.config = config if config is not None else {}
 
         # Сортировка по приоритету
         if priority_order:
             loaded.sort(key=lambda m: m.priority)
 
-        self.logger.info(f"Loaded {len(loaded)} modules total")
-        return loaded
+        initialized = []
+        for module in loaded:
+            try:
+                module.on_load()
+            except Exception as e:
+                self.logger.error(f"Error in {module.name}.on_load(): {e}")
+                try:
+                    module.on_unload()
+                except Exception:
+                    self.logger.exception(f"Error cleaning up {module.name}")
+                continue
+            self.modules[module.name] = module
+            initialized.append(module)
+
+        self.logger.info(f"Loaded {len(initialized)} modules total")
+        return initialized
 
     def get_module(self, module_name: str) -> Optional[BaseModule]:
         """
