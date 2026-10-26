@@ -6,6 +6,7 @@ import urwid
 import logging
 from typing import List, Tuple, Callable, Optional, Dict, Any
 from datetime import datetime
+from core.cpu_power import CpuPowerManager
 
 
 class SelectableText(urwid.Text):
@@ -118,6 +119,7 @@ class UIManager:
         self.battery_monitor = None
         self.thermal_monitor = None
         self.network_monitor = None
+        self.cpu_power = CpuPowerManager()
 
         # Создаём UI компоненты
         self.status_bar = self._create_status_bar()
@@ -279,8 +281,64 @@ class UIManager:
         self.show_module_view(module)
 
     def _on_settings(self, button):
-        """Обработчик настроек"""
-        self.show_message("Settings", "Settings panel coming soon...")
+        """Expose only policies and frequencies reported by the running kernel."""
+        self.view_stack.append(self.frame.body)
+        self._show_cpu_settings()
+
+    def _show_cpu_settings(self):
+        rows = [urwid.Text('CPU power settings', align='center'), urwid.Divider(),
+                urwid.Text('Changes apply immediately and last until reboot or until '
+                           'another power service changes them. No voltage changes.'),
+                urwid.Divider()]
+        try:
+            policies = self.cpu_power.policies()
+        except (OSError, ValueError) as error:
+            policies = []
+            rows.append(urwid.Text(f'Cannot read CPUFreq: {error}'))
+        if not policies:
+            rows.append(urwid.Text('No CPUFreq policies available.'))
+        for policy in policies:
+            name = policy['name']
+            current = policy['current_khz']
+            current_text = f'{current / 1000:g} MHz' if current is not None else 'unknown'
+            rows.append(urwid.Text(
+                f"{name} ({policy['driver']}): {policy['governor']}; "
+                f"reported frequency {current_text}; "
+                f"limits {policy['min_khz'] / 1000:g}–{policy['max_khz'] / 1000:g} MHz"))
+            for governor in policy['governors']:
+                # The userspace governor needs a separate target-frequency control.
+                if governor == 'userspace':
+                    continue
+                control = urwid.Button(f'Governor: {governor}')
+                urwid.connect_signal(control, 'click',
+                    lambda b, n=name, g=governor: self._apply_cpu_setting(n, governor=g))
+                rows.append(urwid.AttrMap(control, 'menu_item', 'menu_focus'))
+            for khz in policy['frequencies_khz']:
+                if not policy['min_khz'] <= khz <= policy['hardware_max_khz']:
+                    continue
+                control = urwid.Button(f'Maximum: {khz / 1000:g} MHz')
+                urwid.connect_signal(control, 'click',
+                    lambda b, n=name, f=khz: self._apply_cpu_setting(n, max_khz=f))
+                rows.append(urwid.AttrMap(control, 'menu_item', 'menu_focus'))
+            rows.append(urwid.Divider())
+        refresh = urwid.Button('Refresh', lambda b: self._show_cpu_settings())
+        back = urwid.Button('Back', lambda b: self.go_back())
+        rows.extend([refresh, back])
+        self.frame.body = MouseScrollListBox(urwid.SimpleFocusListWalker(rows))
+        self.current_view = 'cpu_settings'
+
+    def _apply_cpu_setting(self, name, governor=None, max_khz=None):
+        try:
+            if governor is not None:
+                self.cpu_power.set_governor(name, governor)
+            else:
+                self.cpu_power.set_max_frequency(name, max_khz)
+        except (OSError, ValueError, RuntimeError) as error:
+            # Reload actual state, including changes made before read-back failed.
+            self._show_cpu_settings()
+            self.show_message('CPU settings', str(error))
+            return
+        self._show_cpu_settings()
 
     def _on_help(self, button):
         """Обработчик справки"""
@@ -438,8 +496,10 @@ class UIManager:
             try:
                 self.battery_monitor.update()
                 battery = self.battery_monitor.get_status()
-                if battery and 'soc' in battery:
+                if battery and battery.get('valid', False) and 'soc' in battery:
                     status_parts.append(f"🔋{battery['soc']}%")
+                else:
+                    status_parts.append('🔋?')
             except Exception as e:
                 self.logger.debug(f"Battery monitor error: {e}")
 

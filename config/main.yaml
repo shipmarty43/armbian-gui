@@ -12,8 +12,8 @@ system:
 hardware:
   battery:
     enabled: true
-    i2c_bus: 3  # I2C bus 3 for Orange Pi Zero 2W UPS HAT
-    i2c_address: 0x10  # UPS module I2C address
+    i2c_bus: 3  # Verify the Linux adapter for the wired SDA/SCL after each image change
+    i2c_address: 0x10  # DFR0528 MCU address (not the bare MAX17043 address)
     low_threshold: 20  # %
     critical_threshold: 10
     color_change: true

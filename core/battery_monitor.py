@@ -15,10 +15,10 @@ except ImportError:
 
 class BatteryMonitor:
     """
-    Мониторинг батареи через UPS I2C модуль.
+    Мониторинг DFR0528 через MCU платы, а не напрямую через MAX17043.
 
     I2C адрес: 0x10 (по умолчанию)
-    I2C шина: 3 (по умолчанию для Orange Pi Zero 2W UPS HAT)
+    I2C шина: задаётся по фактическому Linux-адаптеру и распиновке.
     Функции: чтение уровня заряда (%), напряжения (mV)
 
     Протокол UPS модуля:
@@ -29,7 +29,7 @@ class BatteryMonitor:
 
     Формулы:
     - Напряжение (mV) = (((VCELL_H & 0x0F) << 8) + VCELL_L) * 1.25
-    - Процент заряда = ((SOC_H << 8) + SOC_L) * 0.003906
+    - Процент заряда = ((SOC_H << 8) + SOC_L) / 256
     """
 
     def __init__(
@@ -42,7 +42,7 @@ class BatteryMonitor:
         Инициализация монитора батареи UPS.
 
         Args:
-            i2c_bus: Номер I2C шины (по умолчанию 3 для Orange Pi Zero 2W)
+            i2c_bus: Настроенный номер Linux I2C-адаптера; не номер TWI в SoC
             i2c_address: I2C адрес UPS модуля (по умолчанию 0x10)
             poll_interval: Интервал опроса (секунды)
         """
@@ -52,10 +52,13 @@ class BatteryMonitor:
         self.logger = logging.getLogger("cyberdeck.battery")
 
         self.enabled = False
+        self.valid = False
+        self.bus = None
+        self.firmware_version = None
         self.soc = 0  # State of Charge (%)
         self.voltage = 0.0  # Напряжение (V)
         self.voltage_mv = 0  # Напряжение (mV)
-        self.last_update = 0
+        self.last_update = None
 
         if not SMBUS_AVAILABLE:
             self.logger.warning("smbus2 not available, battery monitoring disabled")
@@ -63,12 +66,16 @@ class BatteryMonitor:
 
         try:
             self.bus = SMBus(i2c_bus)
-            # Проверяем доступность UPS модуля
-            self.bus.read_byte_data(i2c_address, 0x03)
+            # 0x10 may also be occupied by an unrelated device on another bus.
+            # DFRobot specifies PID=0xDF at register 0x01 for this HAT.
+            if self.bus.read_byte_data(i2c_address, 0x01) != 0xDF:
+                raise ValueError('I2C device is not a DFR0528 (unexpected product ID)')
+            self.firmware_version = self.bus.read_byte_data(i2c_address, 0x02)
             self.enabled = True
             self.logger.info(f"UPS Battery monitor initialized on I2C bus {i2c_bus}, address 0x{i2c_address:02X}")
         except Exception as e:
             self.logger.error(f"Failed to initialize UPS battery monitor: {e}")
+            self.close()
 
     def read_soc(self) -> Optional[int]:
         """
@@ -85,9 +92,9 @@ class BatteryMonitor:
             soc_h = self.bus.read_byte_data(self.i2c_address, 0x05)
             soc_l = self.bus.read_byte_data(self.i2c_address, 0x06)
 
-            # Формула из рабочего скрипта: ((SOC_H << 8) + SOC_L) * 0.003906
+            # Use the exact binary fraction, avoiding 50% becoming int(49.9968).
             soc_raw = (soc_h << 8) + soc_l
-            soc = soc_raw * 0.003906
+            soc = soc_raw / 256.0
 
             return int(min(100, max(0, soc)))  # Ограничиваем 0-100%
 
@@ -130,20 +137,22 @@ class BatteryMonitor:
         Returns:
             bool: True если данные обновлены
         """
-        current_time = time.time()
+        if not self.enabled:
+            return False
+        current_time = time.monotonic()
 
-        if (current_time - self.last_update) < self.poll_interval:
+        if self.last_update is not None and (current_time - self.last_update) < self.poll_interval:
             return False
 
         soc = self.read_soc()
         voltage = self.read_voltage()
 
-        if soc is not None:
-            self.soc = soc
-        if voltage is not None:
-            self.voltage = voltage
-
         self.last_update = current_time
+        self.valid = soc is not None and voltage is not None
+        if not self.valid:
+            return False
+        self.soc = soc
+        self.voltage = voltage
 
         self.logger.debug(f"UPS Battery: {self.soc}%, {self.voltage_mv}mV ({self.voltage}V)")
         return True
@@ -164,7 +173,9 @@ class BatteryMonitor:
             "soc": self.soc,
             "voltage": self.voltage,
             "voltage_mv": self.voltage_mv,
-            "enabled": self.enabled
+            "enabled": self.enabled,
+            "valid": self.valid,
+            "firmware_version": self.firmware_version,
         }
 
     def get_color(self) -> str:
@@ -191,12 +202,15 @@ class BatteryMonitor:
         Returns:
             bool: True если заряд ниже порога
         """
-        return self.soc < threshold
+        return self.enabled and self.valid and self.soc < threshold
 
     def close(self):
         """Закрыть I2C шину"""
-        if self.enabled and hasattr(self, 'bus'):
+        if self.bus is not None:
             try:
                 self.bus.close()
-            except:
-                pass
+            except Exception as error:
+                self.logger.warning(f'Failed to close battery I2C bus: {error}')
+            self.bus = None
+        self.enabled = False
+        self.valid = False
