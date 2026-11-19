@@ -20,6 +20,12 @@ profile without initializing hardware. Existing `main.yaml` wiring examples
 contain conflicts when all peripherals are enabled together; validation reports
 the affected modules instead of opening conflicting devices.
 
+On Orange Pi Zero 2W, **System Tools → Zero 2W GPIO header** shows the kernel
+owner and direction for each GPIO. Select a row to refresh its status. This
+optional page uses the same `wiringpi-zero2w` package and native library as
+the configurator. Install the wheel in the interpreter that runs this TUI.
+[Python package and board tests](https://github.com/shipmarty43/WiringPi/tree/codex/h618-support/python)
+
 ## Modules in the source tree
 
 ### Experimental modules (hardware validation pending)

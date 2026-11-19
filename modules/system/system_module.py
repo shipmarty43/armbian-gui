@@ -39,6 +39,7 @@ class SystemModule(BaseModule):
         """Пункты меню модуля"""
         return [
             ("System Information", self.system_info),
+            ("Zero 2W GPIO header", self.gpio_header),
             ("File Manager", self.file_manager),
             ("Process Monitor", self.process_monitor),
             ("Network Info", self.network_info),
@@ -51,6 +52,29 @@ class SystemModule(BaseModule):
         return "System: OK"
 
     # ========== Функции модуля ==========
+
+    def gpio_header(self):
+        """Inspect line ownership without requesting or reconfiguring any pin."""
+        try:
+            from wiringpi_zero2w import header_map, line_info
+        except ImportError:
+            self.show_error("Install wiringpi-zero2w in the Python environment running armbian-gui.")
+            return
+        try:
+            pins = list(header_map())
+            rows = []
+            for pin, _, name in pins:
+                info = line_info(pin)
+                owner = (info.consumer or "claimed") if info.used else "unclaimed"
+                rows.append(f"{pin:2}  {name:4}  {info.direction:7}  {owner}")
+            selected = self.show_menu("Physical pin / signal / direction / kernel owner", rows)
+            pin, native, name = pins[selected]
+            info = line_info(pin)
+            self.show_message(f"Physical {pin} · {name}",
+                              f"Sunxi GPIO {native}\nDirection: {info.direction}\n"
+                              f"Kernel claim: {info.used}\nConsumer: {info.consumer or '—'}")
+        except (RuntimeError, OSError) as exc:
+            self.show_error(f"GPIO inventory unavailable: {exc}")
 
     def system_info(self):
         """Системная информация"""
