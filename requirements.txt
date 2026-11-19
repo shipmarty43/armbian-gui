@@ -7,7 +7,8 @@ urwid>=2.1.2
 psutil>=5.9.0
 
 # Hardware control
-# OPi.GPIO>=0.5.0  # Install separately on Orange Pi
+# Waveshare SX1262: install the wiringpi-zero2w wheel and matching native library (docs/hardware/SX1262.md).
+# OPi.GPIO>=0.5.0  # Other legacy board drivers
 spidev>=3.5
 smbus2>=0.4.0
 

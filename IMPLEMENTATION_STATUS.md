@@ -26,8 +26,8 @@ urwid loop cleanly. No peripheral module was loaded in that smoke test.
   standby fails. nRF24 constructor failures release SPI and CE. GPS close is
   idempotent. GPIO cleanup addresses only owned physical pins, never all pins.
 - GPIO leases reject overlapping pins and incompatible global numbering modes.
-  OPi.GPIO itself must still support the actual board; this Python project does
-  not automatically gain H618 support from the separate WiringPi C fork.
+  SX1262 uses the checked WiringPi Zero 2W binding and kernel-controlled CS.
+  CC1101, PN532 and nRF24 still depend on their legacy GPIO backends.
 - Inputs and selection menus collect actual input. Esc/Cancel aborts the current
   action, including through broad module exception handlers. No default action
   is silently selected. Dialogs reuse the running screen; periodic status polling
@@ -84,7 +84,7 @@ external-module wiring; do not reuse the old image's adapter numbers blindly.
 | CC1101 | SPI/FIFO driver exists; arbitrary pulse/RAW capture, protocol decoding, replay fidelity and Flipper compatibility are not established. |
 | PN532 | Resource lifecycle covered; I2C framing/readiness and supported card operations require protocol and device tests. |
 | nRF24 | Resource lifecycle covered; radio scans, CE timing and measurements unverified. |
-| SX1262 / mesh | Initialization cleanup covered; GPIO numbering and hardware setup require checks. Meshtastic interoperability is not established by the local implementation. |
+| SX1262 / mesh | [Waveshare 433/470M driver and board checklist](docs/hardware/SX1262.md). ARM64 GPIO/SPI tests and stock-DTB merge passed. Real RF exchange and interoperability remain open. |
 | GPS | NMEA parser fixtures pass; UART adapter, live fixes and exports need board tests. |
 | SDR / Bluetooth / WiFi / USB gadget | Optional dependencies and menu code exist. End-to-end device operations have not been validated in this work. |
 | TUI / Web UI | Widget tests and native-board PTY input, selection, main menu and clean exit passed. Physical touchscreen untested. Web UI authentication and demo behavior are separate outstanding work. |

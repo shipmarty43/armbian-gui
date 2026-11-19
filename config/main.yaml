@@ -70,20 +70,20 @@ hardware:
     pa_level: 3  # 0: -18dBm, 1: -12dBm, 2: -6dBm, 3: 0dBm (or +20dBm for PA module)
 
   lora:
-    enabled: true  # ✓ Enabled - Waveshare SX1262 LoRa HAT
-    spi_bus: 0
-    spi_device: 0
-    cs_pin: 8
-    reset_pin: 18  # RST pin for Waveshare HAT
-    busy_pin: 24  # BUSY pin for SX1262
-    dio1_pin: 23  # DIO1 pin for SX1262
-    frequency: 868.0  # EU: 868, US: 915, AS: 923
-    spreading_factor: 11  # 7-12 (SF11 for Meshtastic compatibility)
-    bandwidth: 125  # kHz: 125, 250, 500
-    coding_rate: 5  # 5-8
-    tx_power: 20  # dBm (2-20)
+    enabled: true
+    spi_bus: auto  # discover the tagged SX1262 under the H618 header controller
+    spi_device: 0  # logical CS0 in opi-zero2w-sx1262
+    cs_pin: 40     # physical PI3, managed by the SPI core
+    reset_pin: 12
+    busy_pin: 38
+    dio1_pin: 36
+    txen_pin: 31
+    frequency: 433.92  # MHz, Waveshare 433/470M SPI/GNSS HAT
+    spreading_factor: 7
+    bandwidth: 125     # kHz
+    coding_rate: 5     # 4/5
+    tx_power: 14       # dBm
     preamble_length: 8
-    sync_word: 0x12  # Meshtastic sync word
 
 network:
   wifi:
@@ -205,7 +205,7 @@ wardriving:
 
 # Meshtastic configuration
 meshtastic:
-  enabled: true  # ✓ Enabled - Meshtastic mesh networking on SX1262
+  enabled: false  # Optional experimental local packet format
   device: "local"  # "local" for built-in SX1262, or "/dev/ttyUSB0"
 
   channel:
@@ -215,7 +215,7 @@ meshtastic:
     downlink_enabled: true  # ✓ Enabled - MQTT downlink for mesh data
 
   lora_config:
-    region: "EU_868"  # EU_868, US, EU_433, AS_923, etc.
+    region: "EU_433"
     hop_limit: 3
     tx_power: 20  # dBm
 

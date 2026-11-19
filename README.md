@@ -32,7 +32,7 @@ the configurator. Install the wheel in the interpreter that runs this TUI.
 - **Sub-GHz (CC1101)**: SPI/FIFO driver and analysis UI; arbitrary RAW pulse capture and replay fidelity unverified
 - **NFC/RFID (PN532)**: Driver and card-operation menus; protocol/device coverage unverified
 - **WiFi Security**: 6 attack scenarios with hcxtools, wardriving with GPS
-- **LoRa (SX1262)**: Driver and experimental mesh code; Meshtastic interoperability unverified
+- **LoRa (SX1262)**: [Waveshare 433/470M GPIO/SPI profile and board tests](docs/hardware/SX1262.md). Direct LoRa and optional experimental local mesh.
 - **SDR Analysis**: HackRF One and RTL-SDR support
 - **BadUSB**: USB Gadget HID keyboard emulation
 - **GPS Tracking**: Geolocation and wardriving maps

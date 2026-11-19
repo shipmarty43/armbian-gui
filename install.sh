@@ -105,7 +105,12 @@ echo "This may take a few minutes..."
 
 pip install -r requirements.txt
 
-# Install OPi.GPIO if on ARM platform
+# SX1262 uses the wheel built from the project's WiringPi fork.
+if [ -n "${WIRINGPI_ZERO2W_WHEEL:-}" ]; then
+    python -m pip install --no-index --no-deps "$WIRINGPI_ZERO2W_WHEEL" || exit 1
+fi
+
+# Other legacy radio drivers still use OPi.GPIO on ARM
 ARCH=$(uname -m)
 if [ "$ARCH" == "aarch64" ] || [ "$ARCH" == "armv7l" ]; then
     echo ""
@@ -114,7 +119,7 @@ if [ "$ARCH" == "aarch64" ] || [ "$ARCH" == "armv7l" ]; then
         echo "✓ OPi.GPIO installed successfully"
     else
         echo "⚠ WARNING: Failed to install OPi.GPIO"
-        echo "  You may need to install it manually for GPIO support"
+        echo "  Legacy OPi.GPIO drivers may need manual installation"
     fi
 else
     echo "⚠ Non-ARM platform detected ($ARCH). Skipping OPi.GPIO installation."

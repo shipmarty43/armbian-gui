@@ -6,11 +6,11 @@ from test_module_configuration import DummyModule
 
 def test_conflicts_mark_both_modules_and_not_unrelated_modules():
     config = {'hardware': {
-        'nrf24': {'enabled': True, 'spi_bus': 1, 'spi_device': 1, 'ce_pin': 18},
-        'lora': {'enabled': True, 'spi_bus': 1, 'spi_device': 1, 'reset_pin': 18, 'busy_pin': 24, 'dio1_pin': 23}}}
+        'nrf24': {'enabled': True, 'spi_bus': 1, 'spi_device': 0, 'ce_pin': 18},
+        'lora': {'enabled': True, 'spi_bus': 1, 'spi_device': 0, 'reset_pin': 18, 'busy_pin': 38, 'dio1_pin': 36}}}
     errors = hardware_errors(config, ['nrf24', 'lora', 'system'])
     assert set(errors) == {'nrf24', 'lora'}
-    assert any('spidev1.1' in e for e in errors['nrf24'])
+    assert any('spidev1.0' in e for e in errors['nrf24'])
     assert any('GPIO 18' in e for e in errors['lora'])
     config['hardware']['lora']['enabled'] = False
     assert not hardware_errors(config, ['nrf24', 'lora'])

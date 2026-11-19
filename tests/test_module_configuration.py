@@ -130,29 +130,29 @@ def test_subghz_receives_spi_configuration(monkeypatch, tmp_path):
 
 
 @pytest.mark.parametrize('mesh_available', [False, True])
-def test_lora_uses_hardware_section(monkeypatch, tmp_path, mesh_available, caplog):
+def test_lora_uses_hardware_section(monkeypatch, tmp_path, mesh_available):
     imported = importlib.import_module('modules.lora.lora_module')
     monkeypatch.chdir(tmp_path)
     driver = Mock()
-    driver.return_value = Mock(spec=imported.SX1262)
     driver.return_value.initialize.return_value = True
-    monkeypatch.setattr(imported, 'SX1262_AVAILABLE', True)
     monkeypatch.setattr(imported, 'SX1262', driver)
     monkeypatch.setattr(imported, 'MESHTASTIC_PROTOCOL_AVAILABLE', mesh_available)
     monkeypatch.setattr(imported, 'RETICULUM_AVAILABLE', False)
     module = imported.LoRaModule()
     module.config = {'hardware': {'lora': {
-        'enabled': True, 'spi_bus': 2, 'spi_device': 1,
-        'reset_pin': 11, 'busy_pin': 13, 'dio1_pin': 15}}}
+        'enabled': True, 'spi_bus': 2, 'reset_pin': 11, 'busy_pin': 13, 'dio1_pin': 15,
+        'frequency': 433.1}}, 'meshtastic': {'enabled': True}}
     module.on_load()
-    driver.assert_called_once_with(spi_bus=2, spi_device=1, reset_pin=11, busy_pin=13, dio1_pin=15)
+    driver.assert_called_once_with(spi_bus=2, spi_device=0, reset_pin=11, busy_pin=13,
+                                   dio1_pin=15, cs_pin=40, txen_pin=31, frequency_hz=433100000,
+                                   spreading_factor=7, coding_rate=5, bandwidth_hz=125000,
+                                   tx_power=14, preamble_length=8)
     assert module.hardware_enabled
+    assert bool(module.meshtastic) == mesh_available
+    driver.return_value.set_rf_frequency.assert_not_called()
     module.on_unload()
+    assert not module.hardware_enabled
     driver.return_value.close.assert_called_once()
-
-    if mesh_available:
-        driver.return_value.set_rf_frequency.assert_called_once_with(868000000)
-        assert 'Failed to initialize Meshtastic' not in caplog.text
 
 
 def test_pn532_uses_declared_smbus2_dependency(monkeypatch):

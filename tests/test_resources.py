@@ -42,12 +42,8 @@ def test_gpio_refuses_conflicting_numbering_mode():
     gpio.cleanup.assert_not_called()
 
 
-@pytest.mark.parametrize('driver_path,cls_name', [
-    ('modules.subghz.cc1101_driver', 'CC1101'),
-    ('modules.lora.sx1262_driver', 'SX1262'),
-])
-def test_spi_initialize_failure_closes_partial_driver(monkeypatch, driver_path, cls_name):
-    module = importlib.import_module(driver_path)
+def test_cc1101_spi_initialize_failure_closes_partial_driver(monkeypatch):
+    from modules.subghz import cc1101_driver as module
     spi = Mock()
     spi.open.side_effect = OSError('device removed')
     gpio = gpio_mock()
@@ -55,7 +51,7 @@ def test_spi_initialize_failure_closes_partial_driver(monkeypatch, driver_path, 
     monkeypatch.setattr(module, 'spidev', SimpleNamespace(SpiDev=lambda: spi), raising=False)
     monkeypatch.setattr(module, 'GPIO_AVAILABLE', True)
     monkeypatch.setattr(module, 'GPIO', gpio, raising=False)
-    device = getattr(module, cls_name)()
+    device = module.CC1101()
     assert not device.initialize()
     spi.close.assert_called_once()
     assert device.spi is None

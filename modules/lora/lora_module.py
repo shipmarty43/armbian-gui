@@ -5,10 +5,12 @@ Hardware: Waveshare SX1262 LoRa HAT on Orange Pi
 """
 
 from core.base_module import BaseModule
+from core.hardware_config import lora_settings
 from typing import List, Tuple, Callable, Optional
 import time
 import json
 import os
+import random
 
 try:
     from .sx1262_driver import SX1262
@@ -17,7 +19,7 @@ except ImportError:
     SX1262_AVAILABLE = False
 
 try:
-    from .meshtastic_protocol import MeshtasticProtocol, get_meshtastic_lora_config
+    from .meshtastic_protocol import MeshtasticProtocol
     MESHTASTIC_PROTOCOL_AVAILABLE = True
 except ImportError:
     MESHTASTIC_PROTOCOL_AVAILABLE = False
@@ -80,41 +82,13 @@ class LoRaModule(BaseModule):
         # Try to initialize SX1262 hardware
         if SX1262_AVAILABLE:
             try:
-                spi_bus = config.get('spi_bus', 0)
-                spi_device = config.get('spi_device', 0)
-                reset_pin = config.get('reset_pin', 18)
-                busy_pin = config.get('busy_pin', 24)
-                dio1_pin = config.get('dio1_pin', 23)
-                
-                self.sx1262 = SX1262(
-                    spi_bus=spi_bus,
-                    spi_device=spi_device,
-                    reset_pin=reset_pin,
-                    busy_pin=busy_pin,
-                    dio1_pin=dio1_pin
-                )
-                
+                self.sx1262 = SX1262(**lora_settings(config))
                 if self.sx1262.initialize():
                     self.hardware_enabled = True
                     self.log_info("SX1262 LoRa hardware initialized")
 
-                    # Initialize Meshtastic protocol on this hardware
-                    if MESHTASTIC_PROTOCOL_AVAILABLE:
-                        try:
-                            node_id = config.get('node_id', None)
-                            self.meshtastic = MeshtasticProtocol(node_id=node_id)
-
-                            # Configure LoRa for Meshtastic
-                            mesh_config = get_meshtastic_lora_config()
-                            self.sx1262.set_rf_frequency(mesh_config['frequency'])
-                            self.sx1262.spreading_factor = mesh_config['spreading_factor']
-                            self.sx1262.bandwidth = mesh_config['bandwidth']
-                            self.sx1262.tx_power = mesh_config['tx_power']
-
-                            self.log_info(f"Meshtastic protocol initialized on hardware")
-                            self.log_info(f"Node ID: 0x{self.meshtastic.node_id:08X}")
-                        except Exception as e:
-                            self.log_error(f"Failed to initialize Meshtastic protocol: {e}")
+                    if MESHTASTIC_PROTOCOL_AVAILABLE and self.get_config().get('meshtastic', {}).get('enabled'):
+                        self.meshtastic = MeshtasticProtocol(node_id=config.get('node_id'))
                 else:
                     self.log_warning("SX1262 initialization failed")
 
@@ -122,7 +96,7 @@ class LoRaModule(BaseModule):
                 self.log_error(f"Failed to initialize SX1262: {e}")
         
         # Try to initialize Reticulum
-        if RETICULUM_AVAILABLE:
+        if RETICULUM_AVAILABLE and self.get_config().get('reticulum', {}).get('enabled', True):
             try:
                 # Initialize Reticulum
                 RNS.loglevel = RNS.LOG_ERROR
@@ -138,6 +112,8 @@ class LoRaModule(BaseModule):
         if self.mesh_thread:
             self.mesh_thread.join(timeout=2.0)
 
+        self.hardware_enabled = False
+        self.meshtastic = None
         if self.sx1262:
             try:
                 self.sx1262.close()
@@ -348,38 +324,15 @@ class LoRaModule(BaseModule):
     
     def select_mode(self):
         """Выбрать режим работы"""
-        modes = []
-        
-        modes.append("Direct LoRa (Point-to-Point)")
+        modes = [("Direct LoRa (Point-to-Point)", "direct")]
+        if self.meshtastic:
+            modes.append(("Experimental local mesh", "meshtastic"))
+        if self.reticulum:
+            modes.append(("Reticulum Network", "reticulum"))
+        idx = self.show_menu("Select LoRa Mode", [title for title, _ in modes])
+        title, self.mode = modes[idx]
+        self.show_message("Mode", title)
 
-        if MESHTASTIC_PROTOCOL_AVAILABLE and self.meshtastic:
-            modes.append("Meshtastic Mesh")
-
-        if RETICULUM_AVAILABLE:
-            modes.append("Reticulum Network")
-        
-        idx = self.show_menu("Select LoRa Mode", modes)
-        
-        if idx == 0:
-            self.mode = "direct"
-            # Restore direct LoRa settings
-            if self.sx1262:
-                self.sx1262.set_rf_frequency(433920000)  # 433.92 MHz
-                self.sx1262.spreading_factor = 7
-                self.sx1262.tx_power = 22
-            self.show_message("Mode", "Mode: Direct LoRa\n\nLoRa configured for direct TX/RX")
-        elif idx == 1 and self.meshtastic:
-            self.mode = "meshtastic"
-            # Configure for Meshtastic
-            if self.sx1262:
-                mesh_config = get_meshtastic_lora_config()
-                self.sx1262.set_rf_frequency(mesh_config['frequency'])
-                self.sx1262.spreading_factor = mesh_config['spreading_factor']
-            self.show_message("Mode", f"Mode: Meshtastic Mesh\n\nNode: 0x{self.meshtastic.node_id:08X}\n\nLoRa configured for mesh networking")
-        elif idx == 2 and RETICULUM_AVAILABLE:
-            self.mode = "reticulum"
-            self.show_message("Mode", "Mode: Reticulum Network")
-    
     def meshtastic_chat(self):
         """Meshtastic chat interface"""
         if not self.meshtastic:
@@ -455,7 +408,7 @@ class LoRaModule(BaseModule):
                 f"Bandwidth: {self.sx1262.bandwidth/1000}kHz\n\n"
                 f"Mode: {self.mode.upper()}\n"
                 f"Messages: {len(self.messages)}\n\n"
-                f"Meshtastic: {'Available' if MESHTASTIC_AVAILABLE else 'Not installed'}\n"
+                f"Experimental local mesh: {'Enabled' if self.meshtastic else 'Off'}\n"
                 f"Reticulum: {'Available' if RETICULUM_AVAILABLE else 'Not installed'}\n"
             )
         else:

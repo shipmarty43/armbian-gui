@@ -1,0 +1,30 @@
+// Additional test fixture for QEMU virt with the WiringPi gpio-sim test DT.
+/dts-v1/;
+/plugin/;
+
+&{/} {
+    sx1262-test-gpios {
+        compatible = "gpio-simulator";
+        spi_wires: bank {
+            gpio-controller;
+            #gpio-cells = <2>;
+            ngpios = <4>;
+            gpio-sim,label = "sx1262 SPI test wires";
+        };
+    };
+    sx1262-spi-test {
+        compatible = "spi-gpio";
+        #address-cells = <1>;
+        #size-cells = <0>;
+        num-chipselects = <1>;
+        sck-gpios = <&spi_wires 0 0>;
+        miso-gpios = <&spi_wires 1 0>;
+        mosi-gpios = <&spi_wires 2 0>;
+        cs-gpios = <&spi_wires 3 1>;
+        radio@0 {
+            compatible = "semtech,sx1262", "armbian,spi-dev";
+            reg = <0>;
+            spi-max-frequency = <2000000>;
+        };
+    };
+};

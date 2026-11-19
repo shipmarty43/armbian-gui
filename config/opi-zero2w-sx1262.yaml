@@ -1,0 +1,16 @@
+# Direct-mounted Waveshare SX1262 433/470M SPI/GNSS HAT. Physical header numbering.
+system:
+  device: orangepi_zero2w
+  log_level: INFO
+hardware:
+  battery:
+    enabled: false
+  lora:
+    enabled: true
+    spi_bus: auto
+    frequency: 433.92  # MHz
+reticulum:
+  enabled: false
+modules:
+  paths: [modules]
+  autoload: [system, lora]
