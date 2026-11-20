@@ -182,3 +182,43 @@ def test_gadget_setup_refuses_existing_directory(monkeypatch):
     assert not device.setup_gadget()
     assert not device._owned
     device._write_file.assert_not_called()
+
+
+@pytest.mark.parametrize('kind,cs,requested,expected', [
+    ('nfc', 2, 4_000_000, 4_000_000),
+    ('subghz', 0, 8_000_000, 6_500_000),
+    ('nrf24', 1, 2_000_000, 2_000_000),
+])
+def test_spi_clients_set_device_clock_on_open(monkeypatch, tmp_path, kind, cs, requested, expected):
+    from functools import partial
+    from core.spi_clock import device_clock
+
+    node = tmp_path / f'class/spidev/spidev7.{cs}/device/of_node'
+    node.mkdir(parents=True)
+    for key in ('spi-max-frequency', 'armbian,spi-clock-request-hz'):
+        (node / key).write_bytes(requested.to_bytes(4, 'big'))
+    spi = Mock()
+    spidev = SimpleNamespace(SpiDev=lambda: spi)
+    monkeypatch.setitem(sys.modules, 'spidev', spidev)
+    filename = {'nfc': 'pn532_driver', 'subghz': 'cc1101_driver', 'nrf24': 'nrf24_driver'}[kind]
+    module = importlib.import_module(f'modules.{kind}.{filename}')
+    monkeypatch.setattr(module, 'spidev', spidev, raising=False)
+    monkeypatch.setattr(module, 'SPI_AVAILABLE', True, raising=False)
+    monkeypatch.setattr(module, 'GPIO', gpio_mock(), raising=False)
+    monkeypatch.setattr(module, 'GPIO_AVAILABLE', True)
+    monkeypatch.setattr(module, 'device_clock', partial(device_clock, sysfs=tmp_path))
+    if kind == 'nfc':
+        device = module.PN532(spi_bus=7, spi_device=cs)
+    elif kind == 'nrf24':
+        monkeypatch.setattr(module.NRF24Spectrum, 'init_radio', lambda self: None)
+        device = module.NRF24Spectrum(spi_bus=7, spi_device=cs)
+    else:
+        device = module.CC1101(spi_bus=7, spi_device=cs)
+        monkeypatch.setattr(device, 'reset', Mock(side_effect=OSError('stop after SPI setup')))
+        assert not device.initialize()
+    try:
+        spi.open.assert_called_once_with(7, cs)
+        assert spi.max_speed_hz == expected
+        spi.xfer2.assert_not_called()
+    finally:
+        device.close()
