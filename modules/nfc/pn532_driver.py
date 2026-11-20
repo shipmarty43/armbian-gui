@@ -78,6 +78,7 @@ PN532_ACK = bytes([0x00, 0x00, 0xFF, 0x00, 0xFF, 0x00])
 PN532_NACK = bytes([0x00, 0x00, 0xFF, 0xFF, 0x00, 0x00])
 
 
+from core.spi_clock import device_clock
 from core.resources import GpioLease, close_attributes, cleanup_on_failure
 
 class PN532:
@@ -134,7 +135,7 @@ class PN532:
             try:
                 self.spi = spidev.SpiDev()
                 self.spi.open(spi_bus, spi_device)
-                self.spi.max_speed_hz = 1000000  # 1 MHz
+                self.spi.max_speed_hz = device_clock(spi_bus, spi_device, 1_000_000, 5_000_000)
                 self.spi.mode = 0
                 self.logger.info(f"PN532 SPI opened: {spi_bus}.{spi_device}")
             except Exception as e:

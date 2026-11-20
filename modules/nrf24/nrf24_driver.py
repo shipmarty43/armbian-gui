@@ -60,6 +60,7 @@ NRF24_PLL_LOCK = 0x10   # Бит 4 - PLL lock для carrier wave
 NRF24_TX_FULL = 0x20
 
 
+from core.spi_clock import device_clock
 from core.resources import GpioLease, close_attributes, cleanup_on_failure
 
 class NRF24Spectrum:
@@ -102,7 +103,7 @@ class NRF24Spectrum:
         self.spi = spidev.SpiDev()
         try:
             self.spi.open(spi_bus, spi_device)
-            self.spi.max_speed_hz = 8000000
+            self.spi.max_speed_hz = device_clock(spi_bus, spi_device, 8_000_000, 8_000_000)
             self.spi.mode = 0
         except Exception as e:
             self.logger.error(f"Failed to open SPI: {e}")

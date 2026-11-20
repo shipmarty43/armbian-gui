@@ -21,6 +21,7 @@ except ImportError:
 
 
 # CC1101 Register addresses
+from core.spi_clock import device_clock
 from core.resources import GpioLease, close_attributes, cleanup_on_failure
 
 class CC1101Registers:
@@ -142,7 +143,7 @@ class CC1101:
             # Open SPI
             self.spi = spidev.SpiDev()
             self.spi.open(self.spi_bus, self.spi_device)
-            self.spi.max_speed_hz = 5000000  # 5 MHz
+            self.spi.max_speed_hz = device_clock(self.spi_bus, self.spi_device, 5_000_000, 6_500_000)
             self.spi.mode = 0
 
             # Reset chip
