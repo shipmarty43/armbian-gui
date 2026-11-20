@@ -407,10 +407,16 @@ class KernelRadio(unittest.TestCase):
         spi.open(*address)
         try:
             spi.mode = 0
-            spi.max_speed_hz = 2_000_000
-            for bias, expected in (('pull-down', 0x00), ('pull-up', 0xff)):
-                miso.write_text(bias)
-                self.assertEqual(spi.xfer2([0xc0, 0]), [expected, expected])
+            with TemporaryDirectory() as tmp:
+                setting = Path(tmp) / 'spi-hz'
+                for expected_rate in (2_000_000, 16_000_000):
+                    if expected_rate == 16_000_000:
+                        setting.write_text('16000000\n')
+                    spi.max_speed_hz = selected_spi_hz(*address, setting=setting)
+                    self.assertEqual(spi.max_speed_hz, expected_rate)
+                    for bias, expected in (('pull-down', 0x00), ('pull-up', 0xff)):
+                        miso.write_text(bias)
+                        self.assertEqual(spi.xfer2([0xc0, 0]), [expected, expected])
         finally:
             spi.close()
         with self.assertRaises(OSError):
