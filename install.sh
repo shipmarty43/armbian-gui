@@ -12,6 +12,17 @@ echo "Enhanced Mobile Security Platform"
 echo "========================================"
 echo ""
 
+# The Waveshare SPI driver and native LoRaWAN service share one flock inode.
+if [[ -d /run/systemd/system && -e /proc/device-tree/compatible ]] &&
+   tr '\0' '\n' < /proc/device-tree/compatible | grep -qx 'xunlong,orangepi-zero2w'; then
+    if [[ $EUID == 0 ]]; then
+        install -Dm644 "$INSTALL_DIR/hardware/overlays/opi-radio.conf" /usr/local/lib/tmpfiles.d/opi-radio.conf
+        systemd-tmpfiles --create /usr/local/lib/tmpfiles.d/opi-radio.conf
+    else
+        echo "SX1262: provision the shared radio lock as described in docs/hardware/SX1262.md."
+    fi
+fi
+
 # Check if running as root
 if [ "$EUID" -eq 0 ]; then
    echo "Running as root - Hardware access enabled"

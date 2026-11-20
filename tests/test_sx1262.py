@@ -9,6 +9,7 @@ from tempfile import TemporaryDirectory
 import unittest
 from unittest.mock import Mock, call, patch
 
+from core import radio_lock
 from core.hardware_config import hardware_errors, lora_settings
 from modules.lora import sx1262_driver as radio
 from core.sx1262_spi import find_spi
@@ -77,6 +78,16 @@ class Route(unittest.TestCase):
             self.find(7, 0)
 
 
+def provision_lock(case):
+    directory = TemporaryDirectory()
+    case.addCleanup(directory.cleanup)
+    path = Path(directory.name) / 'opi-radio.lock'
+    path.touch()
+    replace = patch.object(radio_lock, 'LOCK_PATH', path)
+    replace.start()
+    case.addCleanup(replace.stop)
+
+
 class RadioFixture:
     """Script the SPI peripheral responses. Keep separate from the GPIO provider."""
     status = 0x24  # STDBY_RC
@@ -121,6 +132,7 @@ class RadioFixture:
 
 class HostRadio(unittest.TestCase):
     def setUp(self):
+        provision_lock(self)
         self.stack = ExitStack()
         self.addCleanup(self.stack.close)
         self.busy, self.dio, self.switch, self.reset = [Mock() for _ in range(4)]
@@ -138,6 +150,18 @@ class HostRadio(unittest.TestCase):
         self.stack.enter_context(patch.object(radio, 'spidev', Mock(SpiDev=lambda: self.spi)))
         self.chip = radio.SX1262()
         self.addCleanup(self.chip.close)
+
+    def test_busy_owner_precedes_hardware_and_close_releases(self):
+        with radio_lock.acquire_radio():
+            self.assertFalse(self.chip.initialize())
+            self.route.assert_not_called()
+            self.gpio.request_input.assert_not_called()
+        self.assertTrue(self.chip.initialize())
+        with self.assertRaises(BlockingIOError):
+            radio_lock.acquire_radio()
+        self.chip.close()
+        with radio_lock.acquire_radio():
+            pass
 
     def test_direct_packet_io_and_cleanup(self):
         self.assertTrue(self.chip.initialize())
@@ -282,6 +306,9 @@ def is_sim():
 
 @unittest.skipUnless(is_sim(), 'requires the WiringPi ARM64 gpio-sim test DT')
 class KernelRadio(unittest.TestCase):
+    def setUp(self):
+        provision_lock(self)
+
     def test_gpio_ownership_irq_and_recovery(self):
         import wiringpi_zero2w as gpio
         bank = next(Path('/sys/devices/platform').glob('gpio-sim*/gpiochip*'))

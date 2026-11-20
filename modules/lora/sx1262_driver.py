@@ -16,6 +16,7 @@ except ImportError:
     gpio = None
 
 from core.hardware_config import LORA_PINS, lora_settings
+from core.radio_lock import acquire_radio
 from core.resources import close_attributes
 from core.sx1262_spi import find_spi
 
@@ -47,7 +48,7 @@ class SX1262:
         self.spi_bus, self.spi_device = spi_bus, spi_device
         self.reset_pin, self.busy_pin = reset_pin, busy_pin
         self.dio1_pin, self.txen_pin = dio1_pin, txen_pin
-        self._reset = self._busy = self._dio1 = self._txen = self.spi = None
+        self._owner = self._reset = self._busy = self._dio1 = self._txen = self.spi = None
         self.enabled = False
         self._lock = threading.RLock()
         self.frequency = frequency_hz
@@ -64,6 +65,7 @@ class SX1262:
             try:
                 if gpio is None or spidev is None:
                     raise RuntimeError('SX1262 requires wiringpi-zero2w, its native library and spidev')
+                self._owner = acquire_radio()
                 bus, device = find_spi(self.spi_bus, self.spi_device)
                 # Claim every control line before pulsing RESET or configuring SPI.
                 self._busy = gpio.request_input(self.busy_pin)
@@ -239,4 +241,4 @@ class SX1262:
                 self.logger.exception('SX1262 standby failed')
             finally:
                 self.enabled = False
-                close_attributes(self, 'spi', '_reset', '_txen', '_dio1', '_busy')
+                close_attributes(self, 'spi', '_reset', '_txen', '_dio1', '_busy', '_owner')
