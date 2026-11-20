@@ -12,7 +12,7 @@ from unittest.mock import Mock, call, patch
 from core import radio_lock
 from core.hardware_config import hardware_errors, lora_settings
 from modules.lora import sx1262_driver as radio
-from core.sx1262_spi import find_spi
+from core.sx1262_spi import find_spi, selected_spi_hz
 
 
 class Route(unittest.TestCase):
@@ -40,6 +40,21 @@ class Route(unittest.TestCase):
         self.dev.mkdir(parents=True)
         (self.dev / 'of_node').symlink_to(self.node)
         self.find = partial(find_spi, sysfs=self.root)
+
+    def test_saved_clock_and_dt_ceiling(self):
+        setting = self.root / 'selected'
+        rate = partial(selected_spi_hz, 7, 0, sysfs=self.root, setting=setting)
+        prop = self.node / 'spi-max-frequency'
+        prop.write_bytes(struct.pack('>I', 16_000_000))
+        self.assertEqual(rate(), 2_000_000)
+        setting.write_text('16000000\n')
+        self.assertEqual(rate(), 16_000_000)
+        prop.write_bytes(struct.pack('>I', 2_000_000))
+        with self.assertRaises(ValueError):
+            rate()
+        setting.write_text('2999')
+        with self.assertRaises(ValueError):
+            rate()
 
     def test_dynamic_numbering_and_explicit_selection(self):
         self.assertEqual(self.find('auto', 0), (7, 0))
@@ -146,6 +161,7 @@ class HostRadio(unittest.TestCase):
         self.gpio.request_output.side_effect = lambda pin, **opts: {12: self.reset, 31: self.switch}[pin]
         self.stack.enter_context(patch.object(radio, 'gpio', self.gpio))
         self.route = self.stack.enter_context(patch.object(radio, 'find_spi', return_value=(7, 0)))
+        self.stack.enter_context(patch.object(radio, 'selected_spi_hz', return_value=12_000_000))
         self.spi = RadioFixture(lambda level: setattr(self.dio.read, 'return_value', level), self.switch.read)
         self.stack.enter_context(patch.object(radio, 'spidev', Mock(SpiDev=lambda: self.spi)))
         self.chip = radio.SX1262()
@@ -167,6 +183,7 @@ class HostRadio(unittest.TestCase):
         self.assertTrue(self.chip.initialize())
         self.assertTrue(self.chip.initialize())
         self.spi.open.assert_called_once_with(7, 0)
+        self.assertEqual(self.spi.max_speed_hz, 12_000_000)
         self.assertEqual(self.gpio.request_input.call_args_list, [call(38), call(36, edge='rising')])
         self.assertEqual(self.gpio.request_output.call_args_list, [call(31, initial=0), call(12, initial=1)])
         self.assertEqual(self.reset.write.call_args_list, [call(0), call(1)])
@@ -317,7 +334,7 @@ class KernelRadio(unittest.TestCase):
         (bank / 'sim_gpio26/pull').write_text('pull-down')  # PI4: BUSY
         spi = RadioFixture(lambda high: irq.write_text('pull-up' if high else 'pull-down'),
                            lambda: int(switch.read_text()))
-        with patch.object(radio, 'spidev', Mock(SpiDev=lambda: spi)), patch.object(radio, 'find_spi', return_value=(7, 0)):
+        with patch.object(radio, 'spidev', Mock(SpiDev=lambda: spi)), patch.object(radio, 'find_spi', return_value=(7, 0)), patch.object(radio, 'selected_spi_hz', return_value=2_000_000):
             chip = radio.SX1262()
             self.addCleanup(chip.close)
             with gpio.request_input(12):
@@ -359,7 +376,7 @@ class KernelRadio(unittest.TestCase):
         loader = ModuleLoader([str(root / 'modules')])
         self.addCleanup(loader.unload_all)
         spi = RadioFixture(lambda high: None, lambda: 0)
-        with patch.object(radio, 'find_spi', return_value=(7, 0)), patch.object(radio, 'spidev', Mock(SpiDev=lambda: spi)):
+        with patch.object(radio, 'selected_spi_hz', return_value=2_000_000), patch.object(radio, 'find_spi', return_value=(7, 0)), patch.object(radio, 'spidev', Mock(SpiDev=lambda: spi)):
             modules = loader.load_all_modules(module_names=['lora'], config=config)
             self.assertEqual(len(modules), 1, loader.status)
             module = modules[0]

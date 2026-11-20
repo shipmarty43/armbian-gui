@@ -18,7 +18,7 @@ except ImportError:
 from core.hardware_config import LORA_PINS, lora_settings
 from core.radio_lock import acquire_radio
 from core.resources import close_attributes
-from core.sx1262_spi import find_spi
+from core.sx1262_spi import find_spi, selected_spi_hz
 
 
 class SX1262:
@@ -67,6 +67,7 @@ class SX1262:
                     raise RuntimeError('SX1262 requires wiringpi-zero2w, its native library and spidev')
                 self._owner = acquire_radio()
                 bus, device = find_spi(self.spi_bus, self.spi_device)
+                spi_hz = selected_spi_hz(bus, device)
                 # Claim every control line before pulsing RESET or configuring SPI.
                 self._busy = gpio.request_input(self.busy_pin)
                 self._dio1 = gpio.request_input(self.dio1_pin, edge='rising')
@@ -75,7 +76,7 @@ class SX1262:
                 self.spi = spidev.SpiDev()
                 self.spi.open(bus, device)
                 self.spi.mode = 0
-                self.spi.max_speed_hz = 2_000_000
+                self.spi.max_speed_hz = spi_hz
                 self.reset()
                 self.set_standby()
                 self._check_standby()

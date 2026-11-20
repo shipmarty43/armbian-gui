@@ -24,7 +24,7 @@ def check(stock, output):
             raise ValueError('Expected the Zero 2W/H618 base DTB')
         spi = '/soc/spi@5011000'
         node = spi + '/radio@0'
-        if (prop(merged, spi, 'status') != ['okay'] or prop(merged, node, 'spi-max-frequency', 'u') != ['2000000']
+        if (prop(merged, spi, 'status') != ['okay'] or prop(merged, node, 'spi-max-frequency', 'u') != ['16000000']
                 or prop(merged, node, 'compatible') != ['semtech,sx1262', 'armbian,spi-dev']):
             raise ValueError('Unexpected SPI endpoint after merge')
         # Materialize the merged DT properties exactly as exposed in sysfs.
@@ -59,7 +59,7 @@ def check(stock, output):
             raise ValueError('Merged DT rejected by runtime detection')
         if output:
             output.write_bytes(overlay.read_bytes())
-        print('PASS H618 SPI1 PH6/PH7/PH8, kernel CS0 on PI3 active-low, 2 MHz, automatic route discovery')
+        print('PASS H618 SPI1 PH6/PH7/PH8, kernel CS0 on PI3 active-low, 16 MHz ceiling, automatic route discovery')
 
 
 if __name__ == '__main__':

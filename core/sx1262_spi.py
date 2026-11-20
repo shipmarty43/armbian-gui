@@ -44,3 +44,19 @@ def find_spi(bus, device, *, sysfs=Path('/sys')):
     if len(matches) != 1:
         raise OSError('Expected one SPI1 SX1262 endpoint; check opi-zero2w-sx1262 and spi_bus')
     return matches[0]
+
+
+def selected_spi_hz(bus, device, *, sysfs=Path('/sys'),
+                    setting=Path('/etc/armbian-config/sx1262-spi-hz')):
+    node = sysfs / f'class/spidev/spidev{bus}.{device}/device/of_node'
+    cell = (node / 'spi-max-frequency').read_bytes()
+    if len(cell) != 4 or int.from_bytes(cell, 'big') < 3000:
+        raise ValueError('Invalid SX1262 device-tree SPI ceiling')
+    limit = min(16_000_000, int.from_bytes(cell, 'big'))
+    try:
+        text = setting.read_bytes().removesuffix(b'\n')
+    except FileNotFoundError:
+        return min(2_000_000, limit)
+    if not re.fullmatch(rb'[0-9]{1,8}', text) or not 3000 <= int(text) <= limit:
+        raise ValueError(f'SX1262 SPI request must be within 3000..{limit} Hz')
+    return int(text)
