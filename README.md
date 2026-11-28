@@ -55,6 +55,13 @@ on pin 18, CS2 on 24, CLK on 23 and MOSI on 19. Saving restores the parked
 SPI clock requests for CC1101 (CS1) and nRF24 (CS2). One undo restores both
 I²C routes and returns the CS1/CS2 clock selections to the saved pool.
 
+To go in the opposite direction from an installed three-device profile, select
+**SPI1 → Отключить общий SPI1 и включить I²C3 и I²C4 на PH**. Preview and
+save once. This uses the current boot configuration even on a fresh install
+with an empty journal. CS1/CS2 clock overrides appear as saved values while
+the I²C buses own PH4–PH7. Selecting the three-device profile again reapplies
+them.
+
 Start the Zero 3W terminal UI with `./cyberdeck --config opi-zero3w-minimal.yaml`.
 This profile loads System Tools. On the Zero 3W the panel reads the A733 live tree and the selected vendor
 Armbian DTB. Each signal pin lists its supported routes alongside the live and
