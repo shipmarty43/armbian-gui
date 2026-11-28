@@ -1,0 +1,17 @@
+# Zero 3W hardware configurator and read-only board status.
+system:
+  device: orangepi_zero3w
+  log_level: INFO
+  log_path: logs/
+hardware:
+  battery:
+    enabled: false
+  thermal:
+    monitoring: true
+    zones: [cpul_thermal_zone, cpub_thermal_zone, gpu_thermal_zone]
+modules:
+  paths: [modules]
+  autoload: [system]
+network:
+  lte:
+    enabled: false

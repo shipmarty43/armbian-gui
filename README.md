@@ -42,7 +42,8 @@ Save stages the selection for the next boot. **Откатить последне
 restores the preceding boot configuration in one action. UART0 appears in the
 map; its console and GNSS settings stay in their dedicated menus.
 
-On the Zero 3W the panel reads the A733 live tree and the selected vendor
+Start the Zero 3W terminal UI with `./cyberdeck --config opi-zero3w-minimal.yaml`.
+This profile loads System Tools. On the Zero 3W the panel reads the A733 live tree and the selected vendor
 Armbian DTB. Each signal pin lists its supported routes alongside the live and
 next-boot owners, including pins that are currently free. It covers SPI2 with independently selectable CS1–CS3, SPI3 with
 two chip selects, I²C0–3, UART2/6/7 and the eight PWM channels routed to the
