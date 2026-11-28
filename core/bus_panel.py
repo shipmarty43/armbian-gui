@@ -67,7 +67,8 @@ def report(state):
     if state["profile"] == "a733":
         return "\n".join([", ".join(state["buses"]) or "Контроллеры SPI выключены",
             *(f"{r['bus']} CS{r['cs']} ({r['pin']}) · {r['device']} · режим {r['mode']} · "
-              f"предел DT {r['ceiling_hz'] or '—'} Гц {r.get('endpoint') or ''}".rstrip() for r in state["rows"])])
+              f"предел DT {r['ceiling_hz'] or '—'} Гц {r.get('endpoint') or ''}".rstrip() for r in state["rows"]),
+            *(f"I²C{k[-1]} · {v['hz']} Гц" for k,v in state.get("i2c_clocks", {}).items())])
     lines = [PROFILES[state["profile"]]]
     for row in state["rows"]:
         extra = " · ".join(str(row[k]) for k in ("endpoint", "lock") if row.get(k))
@@ -133,7 +134,8 @@ def menu(ui):
             if group in ("SPI", "SPI1"):
                 preview += "\nПосле применения\n" + report(plan["candidate"])
             elif group in ("UART", "I²C"):
-                for bus, rate in plan["candidate"].get("pi_clocks", {}).items():
+                clocks = plan["candidate"].get("i2c_clocks", plan["candidate"].get("pi_clocks", {}))
+                for bus, rate in clocks.items():
                     saved = "сохранено " if rate["saved"] else ""
                     preview += f"\nI²C{bus[-1]} · {saved}{rate['hz']} Гц"
             if plan["issues"]:

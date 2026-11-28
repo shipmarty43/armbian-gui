@@ -38,15 +38,18 @@ function scl(rate) {
 function renderI2c() {
   const box = el("i2c-rates");
   box.replaceChildren();
-  el("i2c-section").hidden = !state.current.pi_clocks;
-  if (!state.current.pi_clocks) return;
+  const clocks = model => model.i2c_clocks || model.pi_clocks || {};
+  const buses = state.current.pi_clocks ? ["twi0", "twi1"] : ["twi2"];
+  el("i2c-section").hidden = !(state.current.pi_clocks || state.current.i2c_clocks);
+  if (el("i2c-section").hidden) return;
+  el("i2c-heading").textContent = state.current.pi_clocks ? "Частоты I²C0 и I²C1" : "Частота I²C2";
   const table = add(box, "table", "");
   const heading = table.createTHead().insertRow();
   for (const title of ["Шина", "Сейчас", "Следующая загрузка"]) add(heading, "th", title);
   const body = table.createTBody();
-  for (const bus of ["twi0", "twi1"]) {
+  for (const bus of buses) {
     const tr = body.insertRow();
-    for (const value of ["I²C" + bus.slice(-1), scl(state.live.pi_clocks?.[bus]), scl(state.current.pi_clocks[bus])])
+    for (const value of ["I²C" + bus.slice(-1), scl(clocks(state.live)[bus]), scl(clocks(state.current)[bus])])
       add(tr, "td", value);
   }
 }
@@ -154,8 +157,8 @@ async function run(action, profile = el("profile").value) {
       el("candidate").replaceChildren();
       const group = el("profile").selectedOptions[0].parentElement.label;
       if (["SPI", "SPI1"].includes(group)) render("candidate", plan.candidate);
-      if (["UART", "I²C"].includes(group)) {
-        for (const [bus, rate] of Object.entries(plan.candidate.pi_clocks || {}))
+      if (["UART", "I²C"].includes(group) || (group === "SPI" && plan.candidate.i2c_clocks)) {
+        for (const [bus, rate] of Object.entries(plan.candidate.i2c_clocks || plan.candidate.pi_clocks || {}))
           add(el("candidate"), "p", "I²C" + bus.slice(-1) + " · " + scl(rate));
       }
       el("feedback").textContent = plan.changed ? "" : "Профиль уже выбран.";
