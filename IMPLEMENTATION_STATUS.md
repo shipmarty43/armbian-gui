@@ -50,7 +50,7 @@ python3 core/main.py --config opi-zero2w-minimal.yaml --check-config
 
 `main.yaml` retains the existing wiring examples. It is **not** a verified profile
 for simultaneously connecting every listed device: nRF24 and CC1101 share
-`spidev1.1`, and the LoRa reset and nRF24 CE examples overlap. Validation rejects
+`spidev1.1`. Validation rejects
 conflicting enabled modules before opening hardware. GPIO numbers are physical
 header pins; `cs_pin` does not override the Linux spidev chip select. A nonexistent
 `rfid` package has been removed from autoload; Proxmark remains an external-app
