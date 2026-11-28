@@ -42,6 +42,13 @@ Save stages the selection for the next boot. **Откатить последне
 restores the preceding boot configuration in one action. UART0 appears in the
 map; its console and GNSS settings stay in their dedicated menus.
 
+On Zero 2W, select **UART2 · RTS/CTS · 15/22/5/3** while I²C0 and I²C1
+own the PI pads. The conflict screen offers a combined preview. TX/RX take
+pins 15/22 and RTS/CTS take 5/3. One save selects UART2 for the next boot.
+One undo restores both buses and their clock selections. With the DFR0528
+overlay active, the preview identifies the UPS on I²C1 and blocks the entire
+change. The same controls are available in the native BUS002 menu.
+
 Start the Zero 3W terminal UI with `./cyberdeck --config opi-zero3w-minimal.yaml`.
 This profile loads System Tools. On the Zero 3W the panel reads the A733 live tree and the selected vendor
 Armbian DTB. Each signal pin lists its supported routes alongside the live and

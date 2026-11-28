@@ -22,7 +22,7 @@ def validate(action, profile=None, token=None):
     args = [action]
     if action in ("apply", "preview"):
         if not isinstance(profile, str) or not re.fullmatch(
-                r"a733-[a-z0-9-]{1,30}(?:\+[a-z0-9-]{1,12}){0,19}|shared|single|off|(?:i2c[0-4]|uart[2-5]|pwm[1-4])-[a-z][a-z0-9-]{0,12}", profile):
+                r"a733-[a-z0-9-]{1,30}(?:\+[a-z0-9-]{1,12}){0,19}|shared|single|off|(?:i2c[0-4]|uart[2-5]|pwm[1-4])-[a-z][a-z0-9-]{0,12}(?:\+[a-z0-9-]{1,12}){0,13}", profile):
             raise PanelError("Выберите маршрут гребёнки", 400)
         args.append(profile)
     elif profile is not None:
