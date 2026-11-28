@@ -31,11 +31,59 @@ function render(id, model) {
   for (const [cs, hz] of Object.entries(model.parked || {}))
     add(box, "p", "CS" + cs + " · сохранено " + hz + " Гц");
 }
+function ownerNames(owners) {
+  return owners.map(o => o.label).join(" + ") || "—";
+}
+function pinTable(id, labels, rows) {
+  const box = el(id);
+  box.replaceChildren();
+  if (!rows.length) {
+    add(box, "p", id === "changes" ? "Назначения контактов совпадают." : "Нет заявленных выводов.");
+    return;
+  }
+  const table = add(box, "table", "");
+  const heading = table.createTHead().insertRow();
+  for (const label of ["Вывод", "GPIO", ...labels]) add(heading, "th", label);
+  const body = table.createTBody();
+  for (const row of rows) {
+    const tr = body.insertRow();
+    for (const value of [row.pin, row.pad]) add(tr, "td", value);
+    for (const owners of [row.before, row.after]) {
+      const cell = add(tr, "td", owners ? ownerNames(owners) : "Нет данных");
+      if (owners) cell.title = owners.map(o => o.path).join("\n");
+      if (row.consumer && owners === row.before) add(cell, "small", "GPIO · " + row.consumer);
+      if (owners && owners.length > 1) cell.className = "pin-conflict";
+    }
+  }
+}
+function renderPins() {
+  if (!state) return;
+  const live = new Map(state.live.pins.map(row => [row.pin, row]));
+  const rows = state.current.pins.map(row => ({...row, before: live.get(row.pin)?.owners, consumer: live.get(row.pin)?.gpio_consumer, after: row.owners}));
+  pinTable("pins", [state.live.gpio_known ? "Сейчас (DT и GPIO)" : "Сейчас (DT, gpiochip недоступен)", "Следующая загрузка"], rows.filter(r =>
+    el("all-pins").checked || r.before?.length || r.after.length || r.consumer));
+}
+function renderChoices() {
+  const select = el("profile");
+  const previous = select.value;
+  select.replaceChildren();
+  const groups = new Map();
+  for (const item of state.choices) {
+    if (!groups.has(item.group)) {
+      const group = document.createElement("optgroup");
+      group.label = item.group; select.append(group); groups.set(item.group, group);
+    }
+    add(groups.get(item.group), "option", item.label).value = item.id;
+  }
+  select.value = state.choices.some(item => item.id === previous) ? previous :
+    (["single", "shared", "off"].includes(state.current.profile)
+      ? state.current.profile : "single");
+}
 function controls() {
-  el("profile").disabled = busy;
+  el("profile").disabled = busy || !state;
   el("refresh").disabled = busy;
   el("preview").disabled = busy || !state;
-  if (el("apply")) el("apply").disabled = busy || !plan || !plan.changed;
+  if (el("apply")) el("apply").disabled = busy || !plan || !plan.changed || !plan.token;
   if (el("undo")) el("undo").disabled = busy || !state || !state.undo;
   el("plan").hidden = !plan;
 }
@@ -53,7 +101,8 @@ async function load() {
   state = await api("");
   render("live", state.live);
   render("current", state.current);
-  if (["shared", "single", "off"].includes(state.current.profile)) el("profile").value = state.current.profile;
+  renderChoices();
+  renderPins();
 }
 async function run(action) {
   busy = true; controls();
@@ -61,7 +110,15 @@ async function run(action) {
   try {
     if (action === "preview") {
       plan = await api(action, {profile: el("profile").value});
-      render("candidate", plan.candidate);
+      el("issues").replaceChildren();
+      if (plan.issues.length) {
+        add(el("issues"), "strong", "Применение заблокировано");
+        for (const issue of plan.issues) add(el("issues"), "p", issue);
+      }
+      for (const warning of plan.warnings) add(el("issues"), "p", warning);
+      pinTable("changes", ["Было", "Запрошено"], plan.changes);
+      el("candidate").replaceChildren();
+      if (["single", "shared", "off"].includes(el("profile").value)) render("candidate", plan.candidate);
       el("feedback").textContent = plan.changed ? "" : "Профиль уже выбран.";
     } else {
       if (action === "apply") await api(action, {profile: el("profile").value, token: plan.token});
@@ -77,4 +134,5 @@ async function run(action) {
 for (const name of ["refresh", "preview", "apply", "undo"])
   el(name)?.addEventListener("click", () => run(name));
 el("profile").addEventListener("change", () => { plan = null; controls(); });
+el("all-pins").addEventListener("change", renderPins);
 run("refresh");

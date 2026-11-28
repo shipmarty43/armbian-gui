@@ -29,10 +29,18 @@ the configurator. Install the wheel in the interpreter that runs this TUI.
 ### Шины и контакты (Zero 2W)
 
 Open **System Tools → Шины и контакты** or **Шины и контакты** on the Web
-dashboard (`/buses`). Both show the live SPI1 clients and the next-boot DT
-profile. Select a profile to preview its pins, requested clocks and saved
-CS1/CS2 overrides. Save stages it for the next boot. **Откатить последнее
-изменение** restores the preceding boot configuration in one action.
+dashboard (`/buses`). The pin map lists physical header numbers, SoC pads and
+the owners in the live and next-boot Device Trees. Live GPIO consumers appear
+when Linux grants read access to gpiochip line information. In the Web UI,
+**Все сигнальные выводы** expands the map to all 28 signal pins.
+
+Choose an SPI1, I²C, UART or PWM route to see each affected pin and its old
+and proposed owners. Conflicts show both signals and block saving. For example,
+UART2 PI hardware flow control requires the DFR0528 I²C pins 3 and 5.
+The panel also protects the declared clients of an I²C bus during rerouting.
+Save stages the selection for the next boot. **Откатить последнее изменение**
+restores the preceding boot configuration in one action. UART0 appears in the
+map; its console and GNSS settings stay in their dedicated menus.
 
 Install the companion configng build containing `opi-bus-profile`. Web
 authentication accepts the existing `viewer` account with `OPI_WEB_TOKEN`.

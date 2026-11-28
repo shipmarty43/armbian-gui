@@ -21,8 +21,9 @@ def validate(action, profile=None, token=None):
         raise PanelError("Неизвестная операция", 400)
     args = [action]
     if action in ("apply", "preview"):
-        if not isinstance(profile, str) or profile not in ("shared", "single", "off"):
-            raise PanelError("Выберите профиль SPI1", 400)
+        if not isinstance(profile, str) or not re.fullmatch(
+                r"shared|single|off|(?:i2c[0-4]|uart[2-5]|pwm[1-4])-[a-z][a-z0-9-]{0,12}", profile):
+            raise PanelError("Выберите маршрут гребёнки", 400)
         args.append(profile)
     elif profile is not None:
         raise PanelError("Лишний профиль", 400)
@@ -55,7 +56,8 @@ def query(action, profile=None, token=None, *, operator=True):
         if proc.returncode:
             detail = proc.stderr.strip().splitlines()
             raise PanelError(detail[-1] if detail else "Операция отклонена",
-                             409 if "STALE:" in proc.stderr or "No matching profile change" in proc.stderr else 503)
+                             400 if "INVALID:" in proc.stderr else
+                             409 if any(m in proc.stderr for m in ("CONFLICT:", "STALE:", "No matching profile change")) else 503)
         return json.loads(proc.stdout)
     except (OSError, ValueError, subprocess.TimeoutExpired) as exc:
         raise PanelError("Нет ответа от opi-bus-profile") from exc
@@ -72,24 +74,53 @@ def report(state):
     return "\n".join(lines)
 
 
+def names(owners):
+    return " + ".join(o["label"] for o in owners) or "—"
+
+
 def menu(ui):
     try:
         state = query("state")
-        title = ("Шины и контакты · SPI1 · CLK 23 / MOSI 19 / MISO 21\n"
-                 "Сейчас\n" + report(state["live"]) + "\nПри следующей загрузке\n" + report(state["current"]))
-        profiles = ("single", "shared", "off")
-        items = [PROFILES[p] for p in profiles]
+        groups = list(dict.fromkeys(option["group"] for option in state["choices"]))
+        items = ["Контакты сейчас и при следующей загрузке", *groups]
         if state["undo"]:
             items.append("Откатить последнее изменение")
-        choice = ui.show_menu(title, items)
+        choice = ui.show_menu("Шины и контакты · Zero 2W", items)
         if choice is None or not 0 <= choice < len(items):
             return
-        if choice == len(profiles):
+        if choice == 0:
+            live = {r["pin"]: r for r in state["live"]["pins"]}
+            rows = []
+            for row in state["current"]["pins"]:
+                now = names(live[row["pin"]]["owners"]) if row["pin"] in live else "нет данных"
+                if row["pin"] in live and live[row["pin"]].get("gpio_consumer"):
+                    now += " [GPIO: " + live[row["pin"]]["gpio_consumer"] + "]"
+                rows.append(f"{row['pin']:2} {row['pad']}   {now} → {names(row['owners'])}")
+            source = "DT и GPIO" if state["live"]["gpio_known"] else "DT, сведения gpiochip недоступны"
+            ui.show_menu(f"Физический вывод · сейчас ({source}) → следующая загрузка (DT)", rows)
+            return
+        if choice > len(groups):
             query("undo", token=state["undo"])
         else:
-            profile = profiles[choice]
+            group = groups[choice - 1]
+            options = [o for o in state["choices"] if o["group"] == group]
+            heading = group + " · выберите маршрут для предпросмотра"
+            if group == "SPI1":
+                heading += "\nСейчас\n" + report(state["live"]) + "\nПри следующей загрузке\n" + report(state["current"])
+            index = ui.show_menu(heading, [o["label"] for o in options])
+            if index is None or not 0 <= index < len(options):
+                return
+            profile = options[index]["id"]
             plan = query("preview", profile)
-            preview = "Выбрано\n" + report(plan["current"]) + "\nПосле применения\n" + report(plan["candidate"])
+            preview = options[index]["label"] + "\n" + "\n".join(
+                f"{r['pin']} {r['pad']}   {names(r['before'])} → {names(r['after'])}" for r in plan["changes"])
+            if plan["warnings"]:
+                preview += "\n" + "\n".join(plan["warnings"])
+            if group == "SPI1":
+                preview += "\nПосле применения\n" + report(plan["candidate"])
+            if plan["issues"]:
+                ui.show_menu("Применение заблокировано\n" + "\n".join(plan["issues"]), ["Назад"])
+                return
             if not plan["changed"]:
                 ui.show_message("Профиль уже выбран", preview)
                 return

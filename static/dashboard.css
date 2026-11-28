@@ -12,3 +12,8 @@ nav { margin:.6rem 0 1.2rem } a { color:#bde2d2 }
 #buses table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums }
 #buses th,#buses td { padding:.35rem .55rem; text-align:left; border-bottom:1px solid #374c46 }
 #buses button,#buses select { font:inherit; margin:.25rem .3rem .25rem 0; padding:.3rem .55rem }
+
+#issues,.pin-conflict { color:#ffcb9b }
+#buses td { overflow-wrap:anywhere }
+#buses details { padding-block:.7rem }
+#pins td small { display:block }
