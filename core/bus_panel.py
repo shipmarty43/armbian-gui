@@ -22,7 +22,7 @@ def validate(action, profile=None, token=None):
     args = [action]
     if action in ("apply", "preview"):
         if not isinstance(profile, str) or not re.fullmatch(
-                r"a733-[a-z0-9-]{1,30}(?:\+[a-z0-9-]{1,12}){0,19}|shared-to-i2c34-ph|off|(?:single|shared|(?:i2c[0-4]|uart[2-5]|pwm[1-4])-[a-z][a-z0-9-]{0,12})(?:\+[a-z0-9-]{1,12}){0,13}", profile):
+                r"a733-[a-z0-9-]{1,30}(?:\+[a-z0-9-]{1,12}){0,19}|shared-to-i2c34-ph|uart2-rtscts-to-i2c01-pi|off|(?:single|shared|(?:i2c[0-4]|uart[2-5]|pwm[1-4])-[a-z][a-z0-9-]{0,12})(?:\+[a-z0-9-]{1,12}){0,13}", profile):
             raise PanelError("Выберите маршрут гребёнки", 400)
         args.append(profile)
     elif profile is not None:
@@ -132,6 +132,10 @@ def menu(ui):
                 preview += "\n" + "\n".join(plan["warnings"])
             if group in ("SPI", "SPI1"):
                 preview += "\nПосле применения\n" + report(plan["candidate"])
+            elif group in ("UART", "I²C"):
+                for bus, rate in plan["candidate"].get("pi_clocks", {}).items():
+                    saved = "сохранено " if rate["saved"] else ""
+                    preview += f"\nI²C{bus[-1]} · {saved}{rate['hz']} Гц"
             if plan["issues"]:
                 ui.show_menu("Применение заблокировано\n" + "\n".join(plan["issues"]) + "\n" + preview, ["Назад"])
                 return

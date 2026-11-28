@@ -32,6 +32,24 @@ function render(id, model) {
   for (const [cs, hz] of Object.entries(model.parked || {}))
     add(box, "p", "CS" + cs + " · сохранено " + hz + " Гц");
 }
+function scl(rate) {
+  return rate ? (rate.saved ? "сохранено " : "") + rate.hz + " Гц" : "—";
+}
+function renderI2c() {
+  const box = el("i2c-rates");
+  box.replaceChildren();
+  el("i2c-section").hidden = !state.current.pi_clocks;
+  if (!state.current.pi_clocks) return;
+  const table = add(box, "table", "");
+  const heading = table.createTHead().insertRow();
+  for (const title of ["Шина", "Сейчас", "Следующая загрузка"]) add(heading, "th", title);
+  const body = table.createTBody();
+  for (const bus of ["twi0", "twi1"]) {
+    const tr = body.insertRow();
+    for (const value of ["I²C" + bus.slice(-1), scl(state.live.pi_clocks?.[bus]), scl(state.current.pi_clocks[bus])])
+      add(tr, "td", value);
+  }
+}
 function ownerNames(owners) {
   return owners.map(o => o.label).join(" + ") || "—";
 }
@@ -107,6 +125,7 @@ async function load() {
   el("board").textContent = "Orange Pi " + (state.board || "Zero 2W") + " · 40-контактная гребёнка";
   render("live", state.live);
   render("current", state.current);
+  renderI2c();
   renderChoices();
   renderPins();
 }
@@ -133,7 +152,12 @@ async function run(action, profile = el("profile").value) {
       for (const warning of plan.warnings) add(el("issues"), "p", warning);
       pinTable("changes", ["Было", "Запрошено"], plan.changes);
       el("candidate").replaceChildren();
-      if (["SPI", "SPI1"].includes(el("profile").selectedOptions[0].parentElement.label)) render("candidate", plan.candidate);
+      const group = el("profile").selectedOptions[0].parentElement.label;
+      if (["SPI", "SPI1"].includes(group)) render("candidate", plan.candidate);
+      if (["UART", "I²C"].includes(group)) {
+        for (const [bus, rate] of Object.entries(plan.candidate.pi_clocks || {}))
+          add(el("candidate"), "p", "I²C" + bus.slice(-1) + " · " + scl(rate));
+      }
       el("feedback").textContent = plan.changed ? "" : "Профиль уже выбран.";
     } else {
       if (action === "apply") await api(action, {profile: plan.target, token: plan.token});

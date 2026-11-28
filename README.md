@@ -49,6 +49,14 @@ One undo restores both buses and their clock selections. With the DFR0528
 overlay active, the preview identifies the UPS on I²C1 and blocks the entire
 change. The same controls are available in the native BUS002 menu.
 
+To return directly from UART2, select **UART → Отключить UART2 RTS/CTS и
+включить I²C0 и I²C1 на PI**. The preview lists both SCL frequencies. One
+save selects SCL/SDA on 15/22 for I²C0 and 5/3 for I²C1. BUS002 records each
+explicit PI clock selection when handing the pins to another route and
+reactivates it when enabling the bus. The current boot environment carries
+these selections independently of the undo journal. Older configurations
+without saved clock selections use the board DT defaults.
+
 For the shared Zero 2W SPI1 profile, select **SX1262 + CC1101 + nRF24**
 with I²C3 and I²C4 routed to PH. The combined preview includes nRF24 CE
 on pin 18, CS2 on 24, CLK on 23 and MOSI on 19. Saving restores the parked
