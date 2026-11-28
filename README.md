@@ -48,12 +48,13 @@ Armbian DTB. Each signal pin lists its supported routes alongside the live and
 next-boot owners, including pins that are currently free. It covers SPI2 with independently selectable CS1–CS3, SPI3 with
 two chip selects, I²C0–3, UART2/6/7 and the eight PWM channels routed to the
 header. Camera MCLK uses pin 24, and the vendor test device uses pin 35.
-If a single configurable owner blocks a Zero 3W route, its conflict preview
-offers a combined change. For **SPI3**, choose **Предпросмотр · Отключить камеру
-VIN и включить SPI3…**, inspect the change on pin 24 and save. One **Откатить
-последнее изменение** restores the camera and the previous SPI selection. A
-second owner or a protected bus client blocks the combined save. Individual
-camera and pin-test actions are also available under **Резервы**.
+When several configured owners occupy the requested pins, the conflict screen
+offers one preview naming every owner to release. For example, choose **SPI3**
+with the camera and I²C2 enabled. The preview moves pins 19/23 from SDA/SCL to
+MOSI/CLK and pin 24 from camera MCLK to CS0. Save once, then use **Откатить
+последнее изменение** once to restore both previous routes and the I²C clock.
+An unknown claimant or a protected bus client blocks the combined save.
+Individual camera and pin-test actions are also available under **Резервы**.
 The debug UART remains visible on 8/10. Every route change takes effect at the
 next boot. Use **Откатить последнее изменение** to restore the saved selection.
 
