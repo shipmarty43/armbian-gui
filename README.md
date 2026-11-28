@@ -49,6 +49,12 @@ One undo restores both buses and their clock selections. With the DFR0528
 overlay active, the preview identifies the UPS on I²C1 and blocks the entire
 change. The same controls are available in the native BUS002 menu.
 
+For the shared Zero 2W SPI1 profile, select **SX1262 + CC1101 + nRF24**
+with I²C3 and I²C4 routed to PH. The combined preview includes nRF24 CE
+on pin 18, CS2 on 24, CLK on 23 and MOSI on 19. Saving restores the parked
+SPI clock requests for CC1101 (CS1) and nRF24 (CS2). One undo restores both
+I²C routes and returns the CS1/CS2 clock selections to the saved pool.
+
 Start the Zero 3W terminal UI with `./cyberdeck --config opi-zero3w-minimal.yaml`.
 This profile loads System Tools. On the Zero 3W the panel reads the A733 live tree and the selected vendor
 Armbian DTB. Each signal pin lists its supported routes alongside the live and
