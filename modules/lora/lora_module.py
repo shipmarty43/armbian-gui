@@ -79,6 +79,11 @@ class LoRaModule(BaseModule):
             self.log_info("LoRa disabled in config")
             return
             
+        if self.get_config().get("system",{}).get("device") == "orangepi_zero2w" and config.get("diagnostics_only") is True:
+            self.header_diagnostics = True
+            self.enabled = True
+            return
+
         # Try to initialize SX1262 hardware
         if SX1262_AVAILABLE:
             try:
@@ -122,6 +127,9 @@ class LoRaModule(BaseModule):
     
     def get_menu_items(self) -> List[Tuple[str, Callable]]:
         """Пункты меню модуля"""
+        if getattr(self, "header_diagnostics", False):
+            from core.header_peripherals import diagnostic_menu
+            return diagnostic_menu(self, "lora")
         return [
             ("Send Message", self.send_message),
             ("Receive Messages", self.receive_messages),
@@ -134,6 +142,8 @@ class LoRaModule(BaseModule):
     
     def get_status_widget(self) -> str:
         """Статус для статус-панели"""
+        if getattr(self, "header_diagnostics", False):
+            return "SX1262: diagnostics"
         hw_status = "HW" if self.hardware_enabled else "DEMO"
         return f"LoRa[{hw_status}]: {self.mode.upper()} | {len(self.nodes)} nodes"
     

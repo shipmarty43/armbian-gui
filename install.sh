@@ -17,7 +17,8 @@ if [[ -d /run/systemd/system && -e /proc/device-tree/compatible ]] &&
    tr '\0' '\n' < /proc/device-tree/compatible | grep -qx 'xunlong,orangepi-zero2w'; then
     if [[ $EUID == 0 ]]; then
         install -Dm644 "$INSTALL_DIR/hardware/overlays/opi-radio.conf" /usr/local/lib/tmpfiles.d/opi-radio.conf
-        systemd-tmpfiles --create /usr/local/lib/tmpfiles.d/opi-radio.conf
+        install -Dm644 "$INSTALL_DIR/hardware/overlays/opi-spi1-peers.conf" /usr/local/lib/tmpfiles.d/opi-spi1-peers.conf
+        systemd-tmpfiles --create /usr/local/lib/tmpfiles.d/{opi-radio,opi-spi1-peers}.conf
     else
         echo "SX1262: provision the shared radio lock as described in docs/hardware/SX1262.md."
     fi

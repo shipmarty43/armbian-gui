@@ -166,7 +166,7 @@ def test_spi_probe_releases_every_descriptor_on_error(tmp_path,monkeypatch):
         def open(self,b,c): events.append(f"spi{b}.{c}")
         def xfer2(self,msg): raise OSError("test SPI failure")
         def close(self): events.append("close-spi")
-    monkeypatch.setattr(hp,"acquire_radio",lambda:owned("lock"))
+    monkeypatch.setattr(hp,"acquire_radio",lambda cs:owned("lock"))
     monkeypatch.setitem(sys.modules,"spidev",SimpleNamespace(SpiDev=Spi))
     monkeypatch.setitem(sys.modules,"wiringpi_zero2w",SimpleNamespace(header_map=lambda:[(24,229,"PH5")],
         request_output=lambda pin,initial:owned(f"ce{pin}={initial}")))

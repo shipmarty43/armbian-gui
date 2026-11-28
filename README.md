@@ -481,3 +481,21 @@ and reads status, channel and the latched RPD bit. PN532 GetFirmwareVersion
 checks the ACK, response length and checksum on SPI or raw I²C. The old
 example assigning both radios to spidev1.1 still needs the actual wiring
 resolved. These board pages perform identification and status reads only.
+
+### Three devices on the Zero 2W SPI1 header
+
+Select `shared` in the configurator's SPI1 radio overlay menu. After boot,
+`./cyberdeck --config opi-zero2w-spi1-radios.yaml` offers device information
+for each of the three typed spidev clients. Loading this profile opens no
+radio. Selecting a device takes its own nonblocking lock and reads its status.
+The matching kernel routes are physical 40/PI3 for SX1262 CS0, 26/PH9 for
+CC1101 CS1 and 24/PH5 for nRF24 CS2. The proposed wiring keeps nRF24 CE on
+18/PH4. The actual wire connections still need checking on the board.
+
+The hardware setup in `install.sh` provisions the CS lock files. Existing
+installations can install `hardware/overlays/opi-spi1-peers.conf` beside
+`opi-radio.conf` in the tmpfiles directory and run `systemd-tmpfiles --create`
+on both files. The new configurator package also provisions both definitions.
+Restart older diagnostic clients when upgrading. All cooperating SX1262
+services keep the original CS0 lock inode. Linux arbitrates transfers on the
+shared bus. [Routing, switching and software acceptance](https://github.com/shipmarty43/configng/tree/codex/display-controls/tests/hardware/spi1-radio-twin)

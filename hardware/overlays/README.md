@@ -1,5 +1,12 @@
 # Orange Pi Zero 2W: сохранённые overlays
 
+Для трёх устройств используй профиль `opi-zero2w-spi1-radios` из форка configng.
+Он выбирает SX1262 на физическом 40, CC1101 на 26 и nRF24 на 24.
+Физический 18 остаётся CE nRF24. Конфигуратор ставит этот оверлей при выборе
+`shared`. В TUI armbian-gui ему соответствует `opi-zero2w-spi1-radios.yaml`.
+[Исходный DTS и проверка трёх CS](https://github.com/shipmarty43/configng/tree/codex/display-controls/tests/hardware/spi1-radio-twin)
+
+
 `original/` содержит четыре исходных DTBO с SD-карты и их декомпилированные DTS.
 SHA-256 каждого файла указан в `original/sha256.json`. Это архив состояния,
 а не набор overlays для одновременного включения.

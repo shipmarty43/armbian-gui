@@ -1,0 +1,29 @@
+# Proposed physical wiring for opi-zero2w-spi1-radios. Each device is probed on demand.
+system:
+  device: orangepi_zero2w
+  log_level: INFO
+hardware:
+  battery: {enabled: false}
+  lora:
+    enabled: true
+    diagnostics_only: true
+    spi_bus: auto
+    spi_device: 0
+    cs_pin: 40
+    frequency: 433.92
+  subghz:
+    enabled: true
+    spi_bus: auto
+    spi_device: 1
+    cs_header: 26
+    gdo0_pin: null
+    gdo2_pin: null
+  nrf24:
+    enabled: true
+    spi_bus: auto
+    spi_device: 2
+    cs_header: 24
+    ce_pin: 18
+modules:
+  paths: [modules]
+  autoload: [system, lora, subghz, nrf24]

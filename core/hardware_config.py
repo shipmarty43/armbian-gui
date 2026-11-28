@@ -68,15 +68,23 @@ def hardware_errors(config, names):
                     raise ValueError('NFC interface must be pn532_spi or pn532_i2c')
                 if name != 'nfc' or interface == 'pn532_spi':
                     bus, device = settings.get('spi_bus'), settings.get('spi_device')
-                    if name != 'lora' and any(type(n) is not int or n < 0 for n in (bus, device)):
-                        raise ValueError('spi_bus and spi_device must be non-negative integers')
-                    if name == 'lora' and bus == 'auto':
-                        try:
-                            bus, device = find_spi(bus, device)
-                        except (ValueError, OSError):
-                            bus = None  # Offline preflight. Activation checks the live route again.
-                    if bus is not None:
-                        resources[f'/dev/spidev{bus}.{device}'].append(name)
+                    header = config.get('system', {}).get('device') == 'orangepi_zero2w'
+                    auto = bus == 'auto' and (name == 'lora' or header and name in ('subghz','nrf24'))
+                    if (not auto and (type(bus) is not int or bus < 0)) or type(device) is not int or device < 0:
+                        raise ValueError('Invalid SPI bus or chip-select number')
+                    if header:
+                        if device > 3:
+                            raise ValueError("Header SPI1 supports CS0 through CS3")
+                        # The OF controller is stable even if the Linux bus number changes.
+                        resources[f'header SPI1 CS{device}'].append(name)
+                    else:
+                        if name == 'lora' and auto:
+                            try:
+                                bus, device = find_spi(bus, device)
+                            except (ValueError, OSError):
+                                bus = None
+                        if bus is not None:
+                            resources[f'/dev/spidev{bus}.{device}'].append(name)
                 if name in {"subghz","nrf24","nfc"} and (name != "nfc" or interface == "pn532_spi") and "cs_header" in settings:
                     pin = settings["cs_header"]
                     if type(pin) is not int or pin not in HEADER_GPIO:

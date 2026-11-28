@@ -189,7 +189,8 @@ class ModuleLoader:
                 continue
             try:
                 module.on_load()
-                ready = module.enabled and (not hasattr(module, 'hardware_enabled') or module.hardware_enabled)
+                ready = module.enabled and (getattr(module, 'header_diagnostics', False)
+                                            or getattr(module, 'hardware_enabled', True))
             except BaseException as exc:
                 self.status[module_id] = str(exc) or type(exc).__name__
                 self.logger.error('Error in %s.on_load(): %s', module.name, exc)

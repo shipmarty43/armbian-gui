@@ -7,9 +7,10 @@ import time
 from core.hardware_config import GPIO_KEYS, hardware_errors, lora_settings
 from core.radio_lock import acquire_radio
 from core.spi_clock import device_clock
+from core.sx1262_spi import find_spi, header_endpoint, selected_spi_hz, validate_shared
 
-TYPES = {"subghz": "CC1101", "nrf24": "nRF24", "nfc": "PN532"}
-COMPAT = {"subghz": "ti,cc1101", "nrf24": "nordic,nrf24l01", "nfc": "nxp,pn532"}
+TYPES = {"lora":"SX1262", "subghz": "CC1101", "nrf24": "nRF24", "nfc": "PN532"}
+COMPAT = {"lora":"semtech,sx1262", "subghz": "ti,cc1101", "nrf24": "nordic,nrf24l01", "nfc": "nxp,pn532"}
 ACK = bytes.fromhex("00 00 ff 00 ff 00")
 VERSION = bytes.fromhex("00 00 ff 02 fe d4 02 2a 00")
 REVERSE = bytes(int(f"{n:08b}"[::-1],2) for n in range(256))
@@ -40,6 +41,17 @@ def spi_status(kind, spi, pins):
         if len(reply) != len(data):
             raise OSError("Short SPI response")
         return reply
+    if kind == "lora":
+        end = time.monotonic() + 0.1
+        while pins["busy"].read():
+            if time.monotonic() >= end:
+                raise TimeoutError("SX1262 BUSY timeout before GetStatus")
+            time.sleep(0.001)
+        status = exchange([0xc0, 0])[1]
+        mode, command = (status >> 4) & 7, (status >> 1) & 7
+        if status in (0,255) or mode not in (2,3,4,5,6) or command in (3,4,5):
+            raise OSError(f"Invalid SX1262 GetStatus response {status:#04x}")
+        return dict(status=hex(status),chip_mode=mode,command_status=command)
     if kind == "subghz":
         part = exchange([0xf0,0])[1]
         version = exchange([0xf1,0])[1]
@@ -116,7 +128,7 @@ def chip_select(base, controller, cs, header):
     raise ValueError("Chip select is not routed to the Zero 2W header")
 
 
-def check_control_pins(config, pad):
+def check_control_pins(config, pad, *, sx_select=False):
     for module, keys in GPIO_KEYS.items():
         section = config.get("hardware",{}).get(module,{})
         if not section.get("enabled"):
@@ -124,6 +136,8 @@ def check_control_pins(config, pad):
         if module == "lora":
             section = lora_settings(section)
         for key in keys:
+            if sx_select and module == "lora" and key == "cs_pin":
+                continue
             if section.get(key) == pad:
                 raise ValueError(f"Kernel CS on physical {pad} conflicts with {module}.{key}")
 
@@ -153,21 +167,42 @@ def identify(kind, config, sysroot=Path("/sys")):
             return i2c_firmware(stack.enter_context(SMBus(n)),addr,i2c_msg)
         import spidev
         import wiringpi_zero2w as gpio
-        n, cs=settings["spi_bus"],settings["spi_device"]
+        if kind == "lora":
+            settings = lora_settings(settings)
+            controls = tuple(settings[k] for k in ("reset_pin","busy_pin","dio1_pin","txen_pin"))
+            n, cs = find_spi(settings["spi_bus"],settings["spi_device"],control_pins=controls,sysfs=sysroot)
+        else:
+            n, cs = settings["spi_bus"],settings["spi_device"]
+            if n == "auto":
+                n, cs = header_endpoint(n,cs,COMPAT[kind],sysfs=sysroot)
         node=(sysroot/f"class/spidev/spidev{n}.{cs}/device/of_node").resolve()
         if (node.parent != base/"soc/spi@5011000" or
                 (node/"reg").read_bytes()!=cs.to_bytes(4,"big") or
                 any((node/k).exists() for k in ("spi-cpha","spi-cpol","spi-cs-high"))):
             raise ValueError("Expected a mode-0 SPI endpoint on the Zero 2W header")
         ids=(node/"compatible").read_bytes().rstrip(b"\0").decode().split("\0")
-        if not set(ids) & {COMPAT[kind],"spidev","rohm,dh2228fv"} or set(ids) & (set(COMPAT.values()) - {COMPAT[kind]} | {"semtech,sx1262"}):
+        if not set(ids) & {COMPAT[kind],"spidev","rohm,dh2228fv"} or set(ids) & (set(COMPAT.values()) - {COMPAT[kind]}):
             raise ValueError(f"Unexpected SPI client: {', '.join(ids)}")
         selected = chip_select(base,node.parent,cs,gpio.header_map())
         if settings.get("cs_header",selected) != selected:
             raise ValueError(f"Configured physical CS differs from the kernel route to {selected}")
-        check_control_pins(config,selected)
-        stack.enter_context(acquire_radio())
+        count = node.parent/"num-cs"
+        shared = count.is_file() and count.read_bytes() == struct.pack(">I",3) and (node.parent/"nrf24@2").is_dir()
+        if shared:
+            validate_shared(node.parent,(base/"soc/pinctrl@300b000/phandle").read_bytes())
+            for pad in (40,26,24):
+                check_control_pins(config,pad,sx_select=pad==40)
+            if kind == "nrf24" and settings.get("ce_pin") != 18:
+                raise ValueError("Shared nRF24 profile requires CE on physical 18")
+            if kind == "subghz" and any(settings.get(k) in {12,18,19,21,23,24,26,31,36,38,40}
+                                         for k in ("gdo0_pin","gdo2_pin")):
+                raise ValueError("CC1101 GDO overlaps a reserved shared-profile pin")
+        else:
+            check_control_pins(config,selected,sx_select=kind=="lora")
+        stack.enter_context(acquire_radio(cs))
         pins={}
+        if kind=="lora":
+            pins["busy"] = stack.enter_context(gpio.request_input(settings["busy_pin"]))
         if kind=="nrf24":
             stack.enter_context(gpio.request_output(settings["ce_pin"],initial=0))
         if kind=="subghz":
@@ -179,7 +214,7 @@ def identify(kind, config, sysroot=Path("/sys")):
         spi.open(n,cs)
         spi.mode=0
         spi.lsbfirst=False
-        limit=device_clock(n,cs,500000,{"nfc":5000000,"nrf24":10000000,"subghz":6500000}[kind],sysfs=sysroot)
+        limit=selected_spi_hz(n,cs,sysfs=sysroot) if kind=="lora" else device_clock(n,cs,500000,{"nfc":5000000,"nrf24":10000000,"subghz":6500000}[kind],sysfs=sysroot)
         spi.max_speed_hz=limit
         if spi.mode!=0 or spi.max_speed_hz!=limit:
             raise OSError("SPI settings did not read back")
