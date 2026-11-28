@@ -99,7 +99,9 @@ def menu(ui):
                 now = names(live[row["pin"]]["owners"]) if row["pin"] in live else "нет данных"
                 if row["pin"] in live and live[row["pin"]].get("gpio_consumer"):
                     now += " [GPIO: " + live[row["pin"]]["gpio_consumer"] + "]"
-                rows.append(f"{row['pin']:2} {row['pad']}   {now} → {names(row['owners'])}")
+                routes = " / ".join(row.get("functions", ()))
+                rows.append(f"{row['pin']:2} {row['pad']}   {now} → {names(row['owners'])}" +
+                            ("   ·   " + routes if routes else ""))
             source = "DT и GPIO" if state["live"]["gpio_known"] else "DT, сведения gpiochip недоступны"
             ui.show_menu(f"Физический вывод · сейчас ({source}) → следующая загрузка (DT)", rows)
             return

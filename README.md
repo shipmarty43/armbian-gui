@@ -43,7 +43,8 @@ restores the preceding boot configuration in one action. UART0 appears in the
 map; its console and GNSS settings stay in their dedicated menus.
 
 On the Zero 3W the panel reads the A733 live tree and the selected vendor
-Armbian DTB. It covers SPI2 with independently selectable CS1–CS3, SPI3 with
+Armbian DTB. Each signal pin lists its supported routes alongside the live and
+next-boot owners, including pins that are currently free. It covers SPI2 with independently selectable CS1–CS3, SPI3 with
 two chip selects, I²C0–3, UART2/6/7 and the eight PWM channels routed to the
 header. **Резервы** previews a separate change to the camera or vendor pin-test
 reservation. Camera MCLK uses pin 24, and the vendor test device uses pin 35.

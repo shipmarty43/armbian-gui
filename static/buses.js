@@ -44,7 +44,8 @@ function pinTable(id, labels, rows) {
   }
   const table = add(box, "table", "");
   const heading = table.createTHead().insertRow();
-  for (const label of ["Вывод", "GPIO", ...labels]) add(heading, "th", label);
+  const functions = id === "pins" && state?.board === "Zero 3W";
+  for (const label of ["Вывод", "GPIO", ...labels, ...(functions ? ["Доступные маршруты"] : [])]) add(heading, "th", label);
   const body = table.createTBody();
   for (const row of rows) {
     const tr = body.insertRow();
@@ -55,6 +56,7 @@ function pinTable(id, labels, rows) {
       if (row.consumer && owners === row.before) add(cell, "small", "GPIO · " + row.consumer);
       if (owners && owners.length > 1) cell.className = "pin-conflict";
     }
+    if (functions) add(tr, "td", row.functions?.join(" / ") || "—");
   }
 }
 function renderPins() {
@@ -99,7 +101,9 @@ async function api(action, body) {
 }
 async function load() {
   plan = null;
+  const previousBoard = state?.board;
   state = await api("");
+  if (previousBoard !== state.board) el("all-pins").checked = state.board === "Zero 3W";
   el("board").textContent = "Orange Pi " + (state.board || "Zero 2W") + " · 40-контактная гребёнка";
   render("live", state.live);
   render("current", state.current);
