@@ -5,9 +5,10 @@ import ipaddress
 import os
 from pathlib import Path
 
-from flask import Flask, jsonify, render_template, request
+from flask import Flask, g, jsonify, render_template, request
 import yaml
 
+from core import bus_panel
 from core.board_status import gpio_binding, gpio_inventory, snapshot
 from core.config_loader import ConfigLoader
 
@@ -26,12 +27,17 @@ def create_app(config_file=None, *, token=None, collect=snapshot):
         if not expected:
             return jsonify(error="Dashboard access is not configured"),503
         auth = request.authorization
-        supplied = ""
-        if auth and auth.type == "basic" and auth.username == "viewer":
-            supplied = auth.password or ""
-        elif request.headers.get("Authorization","").startswith("Bearer "):
+        operator = os.environ.get("OPI_WEB_OPERATOR_TOKEN", "")
+        bearer = request.headers.get("Authorization", "").startswith("Bearer ")
+        username, supplied = "", ""
+        if bearer:
             supplied = request.headers["Authorization"][7:]
-        if not hmac.compare_digest(expected.encode(),supplied.encode()):
+        elif auth and auth.type == "basic":
+            username, supplied = auth.username or "", auth.password or ""
+        g.operator = bool(operator and operator != expected and (bearer or username == "operator")
+                          and hmac.compare_digest(operator.encode(), supplied.encode()))
+        viewer = (bearer or username == "viewer") and hmac.compare_digest(expected.encode(), supplied.encode())
+        if not (viewer or g.operator):
             return jsonify(error="Authentication required"),401,{"WWW-Authenticate":'Basic realm="Orange Pi", charset="UTF-8"'}
 
     @app.after_request
@@ -59,6 +65,33 @@ def create_app(config_file=None, *, token=None, collect=snapshot):
     @app.get("/")
     def index():
         return render_template("dashboard.html")
+
+    @app.get("/buses")
+    def buses():
+        return render_template("buses.html", operator=g.operator)
+
+    @app.errorhandler(bus_panel.PanelError)
+    def panel_error(exc):
+        return jsonify(error=str(exc)), exc.status
+
+    @app.get("/api/buses")
+    def bus_state():
+        return jsonify(bus_panel.query("state", operator=g.operator))
+
+    @app.post("/api/buses/<action>")
+    def bus_action(action):
+        if action not in ("preview", "apply", "undo"):
+            return jsonify(error="Unknown operation"), 404
+        if action != "preview" and not g.operator:
+            return jsonify(error="Нужна учётная запись operator"), 403
+        if request.headers.get("X-OPi-Panel") != "1" or not request.is_json:
+            return jsonify(error="Expected a same-origin JSON request"), 400
+        if request.headers.get("Origin", request.host_url.rstrip("/")) != request.host_url.rstrip("/"):
+            return jsonify(error="Invalid origin"), 403
+        body = request.get_json(silent=True)
+        if not isinstance(body, dict) or body.keys() - {"profile", "token"}:
+            return jsonify(error="Invalid profile request"), 400
+        return jsonify(bus_panel.query(action, body.get("profile"), body.get("token"), operator=g.operator))
 
     @app.get("/api/status")
     def status():

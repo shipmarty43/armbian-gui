@@ -41,6 +41,7 @@ class SystemModule(BaseModule):
             ("Board telemetry", self.board_telemetry),
             ("System Information", self.system_info),
             ("GPIO header", self.gpio_header),
+            ("Шины и контакты", self.bus_profiles),
             ("File Manager", self.file_manager),
             ("Process Monitor", self.process_monitor),
             ("Network Info", self.network_info),
@@ -57,6 +58,10 @@ class SystemModule(BaseModule):
     def board_telemetry(self):
         from core.board_status import format_report, snapshot
         self.show_message("Board telemetry", format_report(snapshot(self.get_config())))
+
+    def bus_profiles(self):
+        from core.bus_panel import menu
+        menu(self)
 
     def gpio_header(self):
         """Inspect line ownership without requesting or reconfiguring any pin."""

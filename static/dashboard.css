@@ -6,3 +6,9 @@ section { padding:1rem 0; border-top:1px solid #47615a }
 .grid { display:grid; gap:0 2rem; grid-template-columns:repeat(auto-fit,minmax(min(18rem,100%),1fr)) }
 dl { margin:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.6fr); gap:.35rem 1rem }
 dd { margin:0; text-align:right; overflow-wrap:anywhere; font-variant-numeric:tabular-nums }
+
+nav { margin:.6rem 0 1.2rem } a { color:#bde2d2 }
+#buses section { overflow-x:auto }
+#buses table { width:100%; border-collapse:collapse; font-variant-numeric:tabular-nums }
+#buses th,#buses td { padding:.35rem .55rem; text-align:left; border-bottom:1px solid #374c46 }
+#buses button,#buses select { font:inherit; margin:.25rem .3rem .25rem 0; padding:.3rem .55rem }

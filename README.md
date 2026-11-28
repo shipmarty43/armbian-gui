@@ -26,6 +26,30 @@ optional page uses the same `wiringpi-zero2w` package and native library as
 the configurator. Install the wheel in the interpreter that runs this TUI.
 [Python package and board tests](https://github.com/shipmarty43/WiringPi/tree/codex/h618-support/python)
 
+### Шины и контакты (Zero 2W)
+
+Open **System Tools → Шины и контакты** or **Шины и контакты** on the Web
+dashboard (`/buses`). Both show the live SPI1 clients and the next-boot DT
+profile. Select a profile to preview its pins, requested clocks and saved
+CS1/CS2 overrides. Save stages it for the next boot. **Откатить последнее
+изменение** restores the preceding boot configuration in one action.
+
+Install the companion configng build containing `opi-bus-profile`. Web
+authentication accepts the existing `viewer` account with `OPI_WEB_TOKEN`.
+To enable saving and undo, set a distinct `OPI_WEB_OPERATOR_TOKEN` in the Web
+service environment and sign in as `operator`. Keep the Web process unprivileged.
+For the standalone Zero 2W package, grant only its root-owned helper to the
+service or TUI account through sudoers, replacing `opi-ui` with that account:
+
+```sudoers
+opi-ui ALL=(root) NOPASSWD: /opt/armbian-config-zero2w/bin/opi-bus-profile
+```
+
+For a standard configng installation the helper path is
+`/usr/bin/opi-bus-profile`. The helper accepts fixed profile operations and
+checks the preview token before writing. No configuration paths are accepted
+from the Web client. The viewer can inspect profiles and preview changes.
+
 ## Modules in the source tree
 
 ### Experimental modules (hardware validation pending)

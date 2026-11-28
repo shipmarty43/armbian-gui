@@ -1,0 +1,17 @@
+<!doctype html>
+<html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Шины и контакты · Zero 2W</title><link rel="stylesheet" href="/static/dashboard.css">
+<script src="/static/buses.js" defer></script></head>
+<body><main id="buses" data-operator="{{ 'yes' if operator else 'no' }}">
+<nav><a href="/">Состояние платы</a></nav>
+<header><h1>Шины и контакты</h1><p>Zero 2W · SPI1 · CLK 23 / MOSI 19 / MISO 21</p></header>
+<section><h2>Сейчас</h2><div id="live"></div></section>
+<section><h2>При следующей загрузке</h2><div id="current"></div></section>
+<section><label for="profile">Профиль SPI1</label>
+<select id="profile"><option value="single">SX1262</option><option value="shared">SX1262 + CC1101 + nRF24</option><option value="off">Выключен</option></select>
+<button id="preview" type="button" disabled>Предпросмотр</button></section>
+<section id="plan" hidden><h2>После применения</h2><div id="candidate"></div>
+{% if operator %}<button id="apply" type="button" disabled>Сохранить для следующей загрузки</button>{% endif %}</section>
+{% if operator %}<button id="undo" type="button" disabled>Откатить последнее изменение</button>{% else %}<p>Для сохранения и отката войдите как operator.</p>{% endif %}
+<button id="refresh" type="button">Обновить</button><p id="feedback" role="status"></p>
+</main></body></html>
