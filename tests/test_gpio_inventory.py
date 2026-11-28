@@ -1,6 +1,5 @@
 """System Tools inventory uses only the non-claiming GPIO API."""
 import errno
-import sys
 import unittest
 from types import SimpleNamespace
 from unittest.mock import Mock, patch
@@ -23,8 +22,8 @@ class Inventory(unittest.TestCase):
                 SimpleNamespace(used=False, direction="input", consumer=""),
             ]),
         )
-        with patch.dict(sys.modules, wiringpi_zero2w=api):
-            dict(self.module.get_menu_items())["Zero 2W GPIO header"]()
+        with patch("core.board_status.gpio_binding",return_value=api):
+            dict(self.module.get_menu_items())["GPIO header"]()
         rows = self.module.show_menu.call_args.args[1]
         self.assertIn("unclaimed", rows[0])
         self.assertIn("test-owner", rows[1])
@@ -34,9 +33,10 @@ class Inventory(unittest.TestCase):
 
     def test_missing_binding_or_gpio_device(self):
         fail = Mock(side_effect=OSError(errno.ENODEV, "No such device"))
-        for api in (None, SimpleNamespace(header_map=fail, line_info=Mock())):
-            with patch.dict(sys.modules, wiringpi_zero2w=api):
-                self.module.gpio_header()
+        with patch("core.board_status.gpio_binding",side_effect=ImportError("unavailable")):
+            self.module.gpio_header()
+        with patch("core.board_status.gpio_binding",return_value=SimpleNamespace(header_map=fail,line_info=Mock())):
+            self.module.gpio_header()
         self.assertEqual(self.module.show_message.call_count, 2)
         self.module.show_menu.assert_not_called()
 

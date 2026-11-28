@@ -20,7 +20,7 @@ profile without initializing hardware. Existing `main.yaml` wiring examples
 contain conflicts when all peripherals are enabled together; validation reports
 the affected modules instead of opening conflicting devices.
 
-On Orange Pi Zero 2W, **System Tools → Zero 2W GPIO header** shows the kernel
+On Orange Pi Zero 2W, **System Tools → GPIO header** shows the kernel
 owner and direction for each GPIO. Select a row to refresh its status. This
 optional page uses the same `wiringpi-zero2w` package and native library as
 the configurator. Install the wheel in the interpreter that runs this TUI.
@@ -469,6 +469,8 @@ Open localhost on port 5000, log in as `viewer`, or use the Bearer credential
 for API reads. Use an SSH tunnel for access from another machine, or configure
 a TLS listener with `--host`, `--tls-cert` and `--tls-key`. Absent sensors and
 stale GNSS fixes are shown as unavailable.
+
+The GPIO header action and authenticated `/api/gpio` endpoint read kernel ownership through the detected Zero 2W or Zero 3W binding.
 
 On Zero 2W the CC1101, nRF24 and PN532 menus offer **device information**.
 The probe opens the device for the duration of the action. It checks the

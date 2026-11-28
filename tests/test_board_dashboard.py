@@ -176,3 +176,23 @@ def test_spi_probe_releases_every_descriptor_on_error(tmp_path,monkeypatch):
     events.clear(); cfg["hardware"]["nrf24"]["cs_header"]=26
     with pytest.raises(ValueError,match="CS differs"): hp.identify("nrf24",cfg,tmp_path)
     assert events==[]
+
+
+def test_web_gpio_reads_both_board_profiles_without_claims(tmp_path,monkeypatch):
+    import sys
+    from types import SimpleNamespace
+    from core import board_status
+    import webui_server
+    prop=tmp_path/"firmware/devicetree/base/compatible"; prop.parent.mkdir(parents=True)
+    profile=tmp_path/"profile"; profile.write_text("{}")
+    client=create_app(profile,token="test").test_client()
+    monkeypatch.setattr(webui_server,"gpio_binding",lambda:board_status.gpio_binding(tmp_path))
+    assert client.get("/api/gpio").status_code==401
+    for board,soc,lib,native,pad in (("zero2w","allwinner,sun50i-h618","wiringpi_zero2w",270,"PI14"),
+                                      ("zero3w","arm,sun60iw2p1","wiringpi_zero3w",354,"PL2")):
+        prop.write_bytes(f"xunlong,orangepi-{board}\0{soc}\0".encode())
+        api=SimpleNamespace(header_map=lambda:[(16,native,pad)],
+                            line_info=lambda pin:SimpleNamespace(used=True,consumer="fixture",direction="input"))
+        monkeypatch.setitem(sys.modules,lib,api)
+        response=client.get("/api/gpio",auth=("viewer","test"))
+        assert response.json["pins"]==[dict(pin=16,native=native,name=pad,used=True,consumer="fixture",direction="input")]

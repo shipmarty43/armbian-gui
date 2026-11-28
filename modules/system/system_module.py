@@ -40,7 +40,7 @@ class SystemModule(BaseModule):
         return [
             ("Board telemetry", self.board_telemetry),
             ("System Information", self.system_info),
-            ("Zero 2W GPIO header", self.gpio_header),
+            ("GPIO header", self.gpio_header),
             ("File Manager", self.file_manager),
             ("Process Monitor", self.process_monitor),
             ("Network Info", self.network_info),
@@ -60,25 +60,23 @@ class SystemModule(BaseModule):
 
     def gpio_header(self):
         """Inspect line ownership without requesting or reconfiguring any pin."""
+        from core.board_status import gpio_binding, gpio_inventory
         try:
-            from wiringpi_zero2w import header_map, line_info
-        except ImportError:
-            self.show_error("Install wiringpi-zero2w in the Python environment running armbian-gui.")
-            return
-        try:
-            pins = list(header_map())
+            binding = gpio_binding()
+            pins = gpio_inventory(binding)
             rows = []
-            for pin, _, name in pins:
-                info = line_info(pin)
-                owner = (info.consumer or "claimed") if info.used else "unclaimed"
-                rows.append(f"{pin:2}  {name:4}  {info.direction:7}  {owner}")
+            for p in pins:
+                owner = (p["consumer"] or "claimed") if p["used"] else "unclaimed"
+                rows.append(f"{p['pin']:2}  {p['name']:4}  {p['direction']:7}  {owner}")
             selected = self.show_menu("Physical pin / signal / direction / kernel owner", rows)
-            pin, native, name = pins[selected]
-            info = line_info(pin)
+            if selected is None or not 0 <= selected < len(pins):
+                return
+            pin, native, name = (pins[selected][key] for key in ("pin","native","name"))
+            info = binding.line_info(pin)
             self.show_message(f"Physical {pin} · {name}",
                               f"Sunxi GPIO {native}\nDirection: {info.direction}\n"
                               f"Kernel claim: {info.used}\nConsumer: {info.consumer or '—'}")
-        except (RuntimeError, OSError) as exc:
+        except (RuntimeError, OSError, ImportError) as exc:
             self.show_error(f"GPIO inventory unavailable: {exc}")
 
     def system_info(self):

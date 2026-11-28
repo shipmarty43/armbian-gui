@@ -32,3 +32,14 @@ async function refresh() {
   }
 }
 refresh();
+
+node('gpio-refresh').addEventListener('click', async () => {
+  try {
+    const response = await fetch('/api/gpio', {cache: 'no-store'});
+    if (!response.ok) throw new Error(String(response.status));
+    const {pins} = await response.json();
+    rows('gpio', pins.map(p => [p.pin + ' · ' + p.name, [p.direction, p.used ? (p.consumer || 'занят') : 'свободен'].join(' · ')]));
+  } catch (error) {
+    node('gpio').textContent = 'Данные GPIO недоступны (' + error.message + ').';
+  }
+});

@@ -8,7 +8,7 @@ from pathlib import Path
 from flask import Flask, jsonify, render_template, request
 import yaml
 
-from core.board_status import snapshot
+from core.board_status import gpio_binding, gpio_inventory, snapshot
 from core.config_loader import ConfigLoader
 
 DEFAULT_CONFIG = Path(__file__).resolve().parent/"config/main.yaml"
@@ -67,6 +67,13 @@ def create_app(config_file=None, *, token=None, collect=snapshot):
     @app.get("/api/modules")
     def inventory():
         return jsonify(modules=data()["modules"])
+
+    @app.get("/api/gpio")
+    def gpio():
+        try:
+            return jsonify(pins=gpio_inventory(gpio_binding()))
+        except (OSError,ImportError,RuntimeError):
+            return jsonify(error="GPIO inventory unavailable"),503
 
     @app.get("/api/gps/location")
     def location():

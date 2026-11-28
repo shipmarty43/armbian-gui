@@ -1,7 +1,9 @@
 """Read OS telemetry for the terminal and web dashboards without opening peripherals."""
 from contextlib import contextmanager
 import fcntl
+import errno
 import hashlib
+import importlib
 import json
 import os
 from pathlib import Path
@@ -17,6 +19,24 @@ def value(path):
         return path.read_text().strip().rstrip("\0")
     except (OSError, UnicodeError):
         return None
+
+
+def gpio_binding(sysroot=Path("/sys")):
+    compat = (sysroot/"firmware/devicetree/base/compatible").read_bytes().split(b"\0")
+    if {b"xunlong,orangepi-zero3w", b"arm,sun60iw2p1"} <= set(compat):
+        return importlib.import_module("wiringpi_zero3w")
+    if {b"xunlong,orangepi-zero2w", b"allwinner,sun50i-h618"} <= set(compat):
+        return importlib.import_module("wiringpi_zero2w")
+    raise OSError(errno.ENODEV,"No supported Orange Pi header on this system")
+
+
+def gpio_inventory(binding):
+    rows = []
+    for pin, native, name in binding.header_map():
+        info = binding.line_info(pin)
+        rows.append(dict(pin=pin,native=native,name=name,used=info.used,
+                         direction=info.direction,consumer=info.consumer))
+    return rows
 
 
 def modules(config):
