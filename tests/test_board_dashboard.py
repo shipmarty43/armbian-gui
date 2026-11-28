@@ -196,3 +196,24 @@ def test_web_gpio_reads_both_board_profiles_without_claims(tmp_path,monkeypatch)
         monkeypatch.setitem(sys.modules,lib,api)
         response=client.get("/api/gpio",auth=("viewer","test"))
         assert response.json["pins"]==[dict(pin=16,native=native,name=pad,used=True,consumer="fixture",direction="input")]
+
+
+def test_pn532_spi_bit_order_ack_and_deadline():
+    from core.header_peripherals import spi_status, firmware, ACK, VERSION
+    frame=bytes.fromhex("00 00 ff 06 fa d5 03 32 01 06 07 e8 00")
+    transactions=iter(((b"\x01"+VERSION, bytes(10)),(b"\x02\0",b"\0\x01"),
+                       (b"\x03"+bytes(6),b"\0"+ACK),(b"\x02\0",b"\0\x01"),
+                       (b"\x03"+bytes(13),b"\0"+frame)))
+    reverse=lambda data: [int(f"{n:08b}"[::-1],2) for n in data]
+    class Spi:
+        def xfer2(self, buf):
+            request,reply=next(transactions)
+            assert buf==reverse(request)
+            return reverse(reply)
+    assert spi_status("nfc",Spi(),{})["support"]=="0x7"
+    assert list(transactions)==[]
+    clock=iter((0,2))
+    with pytest.raises(TimeoutError):
+        firmware(lambda _:None,lambda:False,lambda _:None,now=lambda:next(clock),sleep=lambda _:None)
+    with pytest.raises(OSError,match="ACK"):
+        firmware(lambda _:None,lambda:True,lambda _:bytes(6))
