@@ -12,19 +12,20 @@ function add(parent, tag, value) {
 function render(id, model) {
   const box = el(id);
   box.replaceChildren();
-  add(box, "p", names[model.profile]);
+  const vendor = model.profile === "a733";
+  add(box, "p", vendor ? (model.buses.join(", ") || "Контроллеры SPI выключены") : names[model.profile]);
   if (model.rows.length) {
     const table = add(box, "table", "");
     const heading = table.createTHead().insertRow();
     const live = id === "live";
-    for (const label of ["CS", "Устройство", "Вывод", "Запрос, Гц", "Предел DT, Гц",
-                         ...(live ? ["Linux", "Блокировка"] : [])]) add(heading, "th", label);
+    for (const label of [...(vendor ? ["SPI"] : []), "CS", "Устройство", "Вывод", vendor ? "Режим" : "Запрос, Гц", "Предел DT, Гц",
+                         ...(live ? ["Linux"] : []), ...(live && !vendor ? ["Блокировка"] : [])]) add(heading, "th", label);
     const body = table.createTBody();
     for (const row of model.rows) {
       const tr = body.insertRow();
-      for (const value of [row.cs, row.device, row.pin ? row.pin + " / " + row.pad : "—",
-                           row.requested_hz, row.ceiling_hz,
-                           ...(live ? [row.endpoint || "Не привязан", row.lock] : [])])
+      for (const value of [...(vendor ? [row.bus] : []), row.cs, row.device, row.pin ? row.pin + " / " + row.pad : "—",
+                           vendor ? row.mode : row.requested_hz, row.ceiling_hz ?? "—",
+                           ...(live ? [row.endpoint || "Не привязан"] : []), ...(live && !vendor ? [row.lock] : [])])
         add(tr, "td", value);
     }
   }
@@ -77,7 +78,7 @@ function renderChoices() {
   }
   select.value = state.choices.some(item => item.id === previous) ? previous :
     (["single", "shared", "off"].includes(state.current.profile)
-      ? state.current.profile : "single");
+      ? state.current.profile : state.choices[0].id);
 }
 function controls() {
   el("profile").disabled = busy || !state;
@@ -99,6 +100,7 @@ async function api(action, body) {
 async function load() {
   plan = null;
   state = await api("");
+  el("board").textContent = "Orange Pi " + (state.board || "Zero 2W") + " · 40-контактная гребёнка";
   render("live", state.live);
   render("current", state.current);
   renderChoices();
@@ -118,7 +120,7 @@ async function run(action) {
       for (const warning of plan.warnings) add(el("issues"), "p", warning);
       pinTable("changes", ["Было", "Запрошено"], plan.changes);
       el("candidate").replaceChildren();
-      if (["single", "shared", "off"].includes(el("profile").value)) render("candidate", plan.candidate);
+      if (["SPI", "SPI1"].includes(el("profile").selectedOptions[0].parentElement.label)) render("candidate", plan.candidate);
       el("feedback").textContent = plan.changed ? "" : "Профиль уже выбран.";
     } else {
       if (action === "apply") await api(action, {profile: el("profile").value, token: plan.token});

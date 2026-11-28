@@ -26,7 +26,7 @@ optional page uses the same `wiringpi-zero2w` package and native library as
 the configurator. Install the wheel in the interpreter that runs this TUI.
 [Python package and board tests](https://github.com/shipmarty43/WiringPi/tree/codex/h618-support/python)
 
-### Шины и контакты (Zero 2W)
+### Шины и контакты (Zero 2W / Zero 3W)
 
 Open **System Tools → Шины и контакты** or **Шины и контакты** on the Web
 dashboard (`/buses`). The pin map lists physical header numbers, SoC pads and
@@ -34,7 +34,7 @@ the owners in the live and next-boot Device Trees. Live GPIO consumers appear
 when Linux grants read access to gpiochip line information. In the Web UI,
 **Все сигнальные выводы** expands the map to all 28 signal pins.
 
-Choose an SPI1, I²C, UART or PWM route to see each affected pin and its old
+Choose an SPI, I²C, UART or PWM route to see each affected pin and its old
 and proposed owners. Conflicts show both signals and block saving. For example,
 UART2 PI hardware flow control requires the DFR0528 I²C pins 3 and 5.
 The panel also protects the declared clients of an I²C bus during rerouting.
@@ -42,11 +42,19 @@ Save stages the selection for the next boot. **Откатить последне
 restores the preceding boot configuration in one action. UART0 appears in the
 map; its console and GNSS settings stay in their dedicated menus.
 
+On the Zero 3W the panel reads the A733 live tree and the selected vendor
+Armbian DTB. It covers SPI2 with independently selectable CS1–CS3, SPI3 with
+two chip selects, I²C0–3, UART2/6/7 and the eight PWM channels routed to the
+header. **Резервы** previews a separate change to the camera or vendor pin-test
+reservation. Camera MCLK uses pin 24, and the vendor test device uses pin 35.
+The debug UART remains visible on 8/10. Every route change takes effect at the
+next boot. Use **Откатить последнее изменение** to restore the saved selection.
+
 Install the companion configng build containing `opi-bus-profile`. Web
 authentication accepts the existing `viewer` account with `OPI_WEB_TOKEN`.
 To enable saving and undo, set a distinct `OPI_WEB_OPERATOR_TOKEN` in the Web
 service environment and sign in as `operator`. Keep the Web process unprivileged.
-For the standalone Zero 2W package, grant only its root-owned helper to the
+For the standalone `armbian-config-zero2w` package on either board, grant only its root-owned helper to the
 service or TUI account through sudoers, replacing `opi-ui` with that account:
 
 ```sudoers

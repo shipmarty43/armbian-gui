@@ -1,4 +1,4 @@
-"""Client for the installed Zero 2W boot-profile helper."""
+"""Client for the installed Orange Pi boot-profile helper."""
 import json
 import os
 from pathlib import Path
@@ -22,7 +22,7 @@ def validate(action, profile=None, token=None):
     args = [action]
     if action in ("apply", "preview"):
         if not isinstance(profile, str) or not re.fullmatch(
-                r"shared|single|off|(?:i2c[0-4]|uart[2-5]|pwm[1-4])-[a-z][a-z0-9-]{0,12}", profile):
+                r"a733-[a-z0-9-]{1,30}|shared|single|off|(?:i2c[0-4]|uart[2-5]|pwm[1-4])-[a-z][a-z0-9-]{0,12}", profile):
             raise PanelError("Выберите маршрут гребёнки", 400)
         args.append(profile)
     elif profile is not None:
@@ -64,6 +64,10 @@ def query(action, profile=None, token=None, *, operator=True):
 
 
 def report(state):
+    if state["profile"] == "a733":
+        return "\n".join([", ".join(state["buses"]) or "Контроллеры SPI выключены",
+            *(f"{r['bus']} CS{r['cs']} ({r['pin']}) · {r['device']} · режим {r['mode']} · "
+              f"предел DT {r['ceiling_hz'] or '—'} Гц {r.get('endpoint') or ''}".rstrip() for r in state["rows"])])
     lines = [PROFILES[state["profile"]]]
     for row in state["rows"]:
         extra = " · ".join(str(row[k]) for k in ("endpoint", "lock") if row.get(k))
@@ -85,7 +89,7 @@ def menu(ui):
         items = ["Контакты сейчас и при следующей загрузке", *groups]
         if state["undo"]:
             items.append("Откатить последнее изменение")
-        choice = ui.show_menu("Шины и контакты · Zero 2W", items)
+        choice = ui.show_menu("Шины и контакты · " + state.get("board", "Zero 2W"), items)
         if choice is None or not 0 <= choice < len(items):
             return
         if choice == 0:
@@ -105,7 +109,7 @@ def menu(ui):
             group = groups[choice - 1]
             options = [o for o in state["choices"] if o["group"] == group]
             heading = group + " · выберите маршрут для предпросмотра"
-            if group == "SPI1":
+            if group in ("SPI", "SPI1"):
                 heading += "\nСейчас\n" + report(state["live"]) + "\nПри следующей загрузке\n" + report(state["current"])
             index = ui.show_menu(heading, [o["label"] for o in options])
             if index is None or not 0 <= index < len(options):
@@ -116,7 +120,7 @@ def menu(ui):
                 f"{r['pin']} {r['pad']}   {names(r['before'])} → {names(r['after'])}" for r in plan["changes"])
             if plan["warnings"]:
                 preview += "\n" + "\n".join(plan["warnings"])
-            if group == "SPI1":
+            if group in ("SPI", "SPI1"):
                 preview += "\nПосле применения\n" + report(plan["candidate"])
             if plan["issues"]:
                 ui.show_menu("Применение заблокировано\n" + "\n".join(plan["issues"]) + "\n" + preview, ["Назад"])

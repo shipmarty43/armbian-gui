@@ -1,14 +1,14 @@
 <!doctype html>
 <html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Шины и контакты · Zero 2W</title><link rel="stylesheet" href="/static/dashboard.css">
+<title>Шины и контакты</title><link rel="stylesheet" href="/static/dashboard.css">
 <script src="/static/buses.js" defer></script></head>
 <body><main id="buses" data-operator="{{ 'yes' if operator else 'no' }}">
 <nav><a href="/">Состояние платы</a></nav>
-<header><h1>Шины и контакты</h1><p>Orange Pi Zero 2W · 40-контактная гребёнка</p></header>
+<header><h1>Шины и контакты</h1><p id="board">40-контактная гребёнка</p></header>
 <section><h2>Занятые контакты</h2>
 <label><input type="checkbox" id="all-pins"> Все сигнальные выводы</label>
 <div id="pins"></div></section>
-<details><summary>Устройства SPI1 и частоты</summary>
+<details><summary>Устройства SPI и частоты</summary>
 <section><h2>Сейчас</h2><div id="live"></div></section>
 <section><h2>При следующей загрузке</h2><div id="current"></div></section></details>
 <section><label for="profile">Маршрут для следующей загрузки</label>
