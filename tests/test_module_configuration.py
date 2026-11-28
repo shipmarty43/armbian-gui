@@ -117,8 +117,7 @@ def test_subghz_receives_spi_configuration(monkeypatch, tmp_path):
     monkeypatch.chdir(tmp_path)
     driver = Mock()
     driver.return_value.initialize.return_value = True
-    monkeypatch.setattr(imported, 'CC1101_AVAILABLE', True)
-    monkeypatch.setattr(imported, 'CC1101', driver)
+    monkeypatch.setattr(importlib.import_module('modules.subghz.cc1101_driver'), 'CC1101', driver)
     module = imported.SubGHzModule()
     module.config = {'hardware': {'subghz': {
         'enabled': True, 'spi_bus': 3, 'spi_device': 0, 'cs_pin': 24, 'gdo0_pin': 16}}}

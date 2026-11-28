@@ -432,7 +432,7 @@ earlier copies remain unaffected. See [LICENSE](LICENSE) for the complete terms.
 - Verified GPIO backend for Python drivers and conflict-free peripheral wiring
 - CC1101, PN532, nRF24 and SX1262 protocol/device acceptance
 - Meshtastic/Reticulum interoperability and live GPS fixes
-- SDR device validation and Web UI authentication/API review
+- SDR device validation and physical peripheral acceptance
 - Bluetooth terminal control, CAN Bus and ML signal classification
 
 The previous “Current Stable / Hardware Integration Complete” labels were not
@@ -450,3 +450,32 @@ for the distinction between implemented code, fixture tests and board evidence.
 **Built with ❤️ for the security research community**
 
 *Verification status updated: 2026-10-26 | Experimental project*
+
+## Board diagnostics and the web viewer
+
+Choose **System Tools → Board telemetry** in the TUI for kernel, temperatures,
+battery level and state, network links, GNSS freshness and module status. Start
+the web viewer with the same YAML profile and OS account to see the active
+TUI's loader results. With the TUI closed, the viewer still reads the OS
+sensors and distinguishes profile selection from a running module.
+
+```sh
+read -rs -p 'Viewer password: ' OPI_WEB_TOKEN
+export OPI_WEB_TOKEN
+python3 webui_server.py --config config/opi-zero2w-minimal.yaml
+```
+
+Open localhost on port 5000, log in as `viewer`, or use the Bearer credential
+for API reads. Use an SSH tunnel for access from another machine, or configure
+a TLS listener with `--host`, `--tls-cert` and `--tls-key`. Absent sensors and
+stale GNSS fixes are shown as unavailable.
+
+On Zero 2W the CC1101, nRF24 and PN532 menus offer **device information**.
+The probe opens the device for the duration of the action. It checks the
+kernel-selected chip select, SPI mode and client clock. Optional `cs_header`
+asserts the physical CS contact from the wiring. The CC1101 probe reads chip
+identity, MARCSTATE and configured GDO inputs. The nRF24 probe holds CE low
+and reads status, channel and the latched RPD bit. PN532 GetFirmwareVersion
+checks the ACK, response length and checksum on SPI or raw I²C. The old
+example assigning both radios to spidev1.1 still needs the actual wiring
+resolved. These board pages perform identification and status reads only.

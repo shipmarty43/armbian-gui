@@ -38,6 +38,7 @@ class SystemModule(BaseModule):
     def get_menu_items(self) -> List[Tuple[str, Callable]]:
         """Пункты меню модуля"""
         return [
+            ("Board telemetry", self.board_telemetry),
             ("System Information", self.system_info),
             ("Zero 2W GPIO header", self.gpio_header),
             ("File Manager", self.file_manager),
@@ -52,6 +53,10 @@ class SystemModule(BaseModule):
         return "System: OK"
 
     # ========== Функции модуля ==========
+
+    def board_telemetry(self):
+        from core.board_status import format_report, snapshot
+        self.show_message("Board telemetry", format_report(snapshot(self.get_config())))
 
     def gpio_header(self):
         """Inspect line ownership without requesting or reconfiguring any pin."""

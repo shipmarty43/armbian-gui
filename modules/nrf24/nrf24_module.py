@@ -33,6 +33,10 @@ class NRF24Module(BaseModule):
 
     def on_load(self):
         """Инициализация модуля"""
+        if self.get_config().get("system", {}).get("device") == "orangepi_zero2w":
+            self.header_diagnostics = True
+            self.enabled = self.get_config().get("hardware", {}).get("nrf24", {}).get("enabled", False)
+            return
         self.log_info("nRF24 module loading...")
 
         # Load configuration
@@ -80,6 +84,9 @@ class NRF24Module(BaseModule):
 
     def get_menu_items(self) -> List[Tuple[str, Callable]]:
         """Пункты меню модуля"""
+        if getattr(self, "header_diagnostics", False):
+            from core.header_peripherals import diagnostic_menu
+            return diagnostic_menu(self, "nrf24") if self.enabled else []
         if not self.enabled:
             return [
                 ("Status: nRF24 Not Available", lambda: None),
@@ -94,6 +101,8 @@ class NRF24Module(BaseModule):
 
     def get_status_widget(self) -> str:
         """Статус для статус-панели"""
+        if getattr(self, "header_diagnostics", False):
+            return "nrf24: diagnostics" if self.enabled else "nrf24: disabled"
         if not self.enabled:
             return "nRF24: Disabled"
 

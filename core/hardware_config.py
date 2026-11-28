@@ -5,7 +5,7 @@ from core.sx1262_spi import find_spi
 
 HARDWARE_MODULES = {'gps', 'nfc', 'subghz', 'nrf24', 'lora'}
 LORA_PINS = {'reset_pin': 12, 'busy_pin': 38, 'dio1_pin': 36, 'txen_pin': 31, 'cs_pin': 40}
-GPIO_KEYS = {'nfc': ('reset_pin',), 'nrf24': ('ce_pin',),
+GPIO_KEYS = {'subghz': ('gdo0_pin', 'gdo2_pin'), 'nfc': ('reset_pin',), 'nrf24': ('ce_pin',),
              'lora': tuple(LORA_PINS)}
 HEADER_GPIO = {3, 5, 7, 8, 10, 11, 12, 13, 15, 16, 18, 19, 21, 22,
                23, 24, 26, 27, 28, 29, 31, 32, 33, 35, 36, 37, 38, 40}
@@ -77,9 +77,14 @@ def hardware_errors(config, names):
                             bus = None  # Offline preflight. Activation checks the live route again.
                     if bus is not None:
                         resources[f'/dev/spidev{bus}.{device}'].append(name)
+                if name in {"subghz","nrf24","nfc"} and (name != "nfc" or interface == "pn532_spi") and "cs_header" in settings:
+                    pin = settings["cs_header"]
+                    if type(pin) is not int or pin not in HEADER_GPIO:
+                        raise ValueError("cs_header must be the physical pin wired to the kernel chip select")
+                    resources[f'physical GPIO {pin}'].append(name)
                 for key in GPIO_KEYS.get(name, ()):
                     pin = settings.get(key)
-                    if pin is None and key == 'reset_pin' and name == 'nfc':
+                    if pin is None and (name == 'subghz' or key == 'reset_pin' and name == 'nfc'):
                         continue
                     if type(pin) is not int or pin not in HEADER_GPIO:
                         raise ValueError(f'{key} must be a GPIO-capable physical header pin')

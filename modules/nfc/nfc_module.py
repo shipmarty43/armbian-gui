@@ -51,6 +51,10 @@ class NFCModule(BaseModule):
 
     def on_load(self):
         """Инициализация модуля"""
+        if self.get_config().get("system", {}).get("device") == "orangepi_zero2w":
+            self.header_diagnostics = True
+            self.enabled = self.get_config().get("hardware", {}).get("nfc", {}).get("enabled", False)
+            return
         self.log_info("NFC module loading...")
 
         # Load configuration
@@ -117,6 +121,9 @@ class NFCModule(BaseModule):
 
     def get_menu_items(self) -> List[Tuple[str, Callable]]:
         """Пункты меню модуля"""
+        if getattr(self, "header_diagnostics", False):
+            from core.header_peripherals import diagnostic_menu
+            return diagnostic_menu(self, "nfc") if self.enabled else []
         if not self.enabled:
             return [
                 ("Status: NFC Not Available", lambda: None),
@@ -134,6 +141,8 @@ class NFCModule(BaseModule):
 
     def get_status_widget(self) -> str:
         """Статус для статус-панели"""
+        if getattr(self, "header_diagnostics", False):
+            return "nfc: diagnostics" if self.enabled else "nfc: disabled"
         if not self.enabled:
             return "NFC: Disabled"
 

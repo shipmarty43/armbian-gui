@@ -36,7 +36,6 @@ pytest-cov
 
 # Web UI
 flask>=3.0.0
-flask-cors>=4.0.0
 
 # LoRa Mesh Networking (optional)
 # meshtastic>=2.2.0  # Uncomment for Meshtastic

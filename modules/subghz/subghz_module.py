@@ -3,16 +3,13 @@ Sub-GHz Module - захват и воспроизведение сигналов
 """
 
 from core.base_module import BaseModule
-from typing import List, Tuple, Callable, Optional
+from typing import List, Tuple, Callable, TYPE_CHECKING, Optional
 import time
 import json
 import os
 
-try:
+if TYPE_CHECKING:
     from .cc1101_driver import CC1101
-    CC1101_AVAILABLE = True
-except ImportError:
-    CC1101_AVAILABLE = False
 
 
 class SubGHzModule(BaseModule):
@@ -33,7 +30,7 @@ class SubGHzModule(BaseModule):
             priority=1  # Highest priority
         )
 
-        self.cc1101: Optional[CC1101] = None
+        self.cc1101: Optional["CC1101"] = None
         self.hardware_enabled = False
         self.current_frequency = 433.92  # MHz
         self.current_modulation = "ASK_OOK"
@@ -49,6 +46,10 @@ class SubGHzModule(BaseModule):
 
     def on_load(self):
         """Инициализация модуля"""
+        if self.get_config().get("system", {}).get("device") == "orangepi_zero2w":
+            self.header_diagnostics = True
+            self.enabled = self.get_config().get("hardware", {}).get("subghz", {}).get("enabled", False)
+            return
         self.log_info("Sub-GHz module loaded")
 
         # Create signals directory
@@ -58,7 +59,11 @@ class SubGHzModule(BaseModule):
         self.load_saved_signals()
 
         # Initialize CC1101 hardware
-        if CC1101_AVAILABLE:
+        try:
+            from .cc1101_driver import CC1101
+        except ImportError:
+            CC1101 = None
+        if CC1101 is not None:
             try:
                 # Get config from module
                 config = self.get_config().get('hardware', {}).get('subghz', {})
@@ -101,6 +106,9 @@ class SubGHzModule(BaseModule):
 
     def get_menu_items(self) -> List[Tuple[str, Callable]]:
         """Пункты меню модуля"""
+        if getattr(self, "header_diagnostics", False):
+            from core.header_peripherals import diagnostic_menu
+            return diagnostic_menu(self, "subghz") if self.enabled else []
         return [
             ("Read RAW Signal", self.read_signal),
             ("Replay Signal", self.replay_signal),
@@ -114,6 +122,8 @@ class SubGHzModule(BaseModule):
 
     def get_status_widget(self) -> str:
         """Статус для статус-панели"""
+        if getattr(self, "header_diagnostics", False):
+            return "subghz: diagnostics" if self.enabled else "subghz: disabled"
         hw_status = "HW" if self.hardware_enabled else "DEMO"
         if self.is_recording:
             return f"SubGHz[{hw_status}]: REC {self.current_frequency}MHz"

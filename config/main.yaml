@@ -44,7 +44,7 @@ hardware:
     interface: "pn532_spi"  # or "pn532_i2c", "pn532_uart"
     spi_bus: 1
     spi_device: 2
-    cs_pin: 23
+    cs_pin: 23  # Legacy profile only. Zero 2W reads the actual CS from the device tree.
     reset_pin: null  # GPIO pin for reset (optional)
     i2c_bus: 0
     i2c_address: 0x24
@@ -53,8 +53,8 @@ hardware:
     enabled: true
     spi_bus: 1
     spi_device: 1
-    cs_pin: 20  # GPIO chip select pin (CE для CC1101)
-    gdo0_pin: 25
+    cs_pin: 20  # Legacy value. Set cs_header only after verifying the physical CS wire.
+    gdo0_pin: null  # Set a verified physical header GPIO to sample GDO0
     gdo2_pin: null
     default_freq: 433.92  # MHz
     freq_range: [300, 928]  # MHz

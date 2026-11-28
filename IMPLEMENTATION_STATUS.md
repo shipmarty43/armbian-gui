@@ -27,7 +27,7 @@ urwid loop cleanly. No peripheral module was loaded in that smoke test.
   idempotent. GPIO cleanup addresses only owned physical pins, never all pins.
 - GPIO leases reject overlapping pins and incompatible global numbering modes.
   SX1262 uses the checked WiringPi Zero 2W binding and kernel-controlled CS.
-  CC1101, PN532 and nRF24 still depend on their legacy GPIO backends.
+  The Zero 2W device-information pages for CC1101, PN532 and nRF24 use wiringpi-zero2w and the kernel bus drivers. Legacy actions for other board profiles retain their original backends.
 - Inputs and selection menus collect actual input. Esc/Cancel aborts the current
   action, including through broad module exception handlers. No default action
   is silently selected. Dialogs reuse the running screen; periodic status polling
@@ -87,9 +87,9 @@ external-module wiring; do not reuse the old image's adapter numbers blindly.
 | SX1262 / mesh | [Waveshare 433/470M driver and board checklist](docs/hardware/SX1262.md). ARM64 GPIO/SPI tests and stock-DTB merge passed. Real RF exchange and interoperability remain open. |
 | GPS | NMEA parser fixtures pass; UART adapter, live fixes and exports need board tests. |
 | SDR / Bluetooth / WiFi / USB gadget | Optional dependencies and menu code exist. End-to-end device operations have not been validated in this work. |
-| TUI / Web UI | Widget tests and native-board PTY input, selection, main menu and clean exit passed. Physical touchscreen untested. Web UI authentication and demo behavior are separate outstanding work. |
+| TUI / Web UI | Widget tests and native-board PTY input, selection, main menu and clean exit passed. Physical touchscreen untested. The web viewer authenticates status, module and GNSS reads. The terminal and web dashboard share the same OS telemetry and TUI loader status. |
 
 No RF transmission, GPIO electrical test, real card emulation or gadget action
 is claimed by these tests. Tasks concerning protocol
-correctness, Web UI and full hardware acceptance remain separate from this
+correctness and full hardware acceptance remain separate from this
 lifecycle/configuration/UI work.

@@ -161,6 +161,12 @@ def main():
                 priority_order=priority_order, module_names=autoload_modules, config=config
             )
 
+            if not args.no_ui:
+                from core.board_status import loader_session
+                try:
+                    resources.enter_context(loader_session(config, module_loader.status))
+                except (OSError, TypeError, ValueError) as exc:
+                    logger.warning(f"Web dashboard cannot read this TUI session: {exc}")
             logger.info(f"Loaded {len(loaded_modules)} modules")
             for module in loaded_modules:
                 logger.info(

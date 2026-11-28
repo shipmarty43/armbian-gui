@@ -1,105 +1,106 @@
-"""
-Web UI Server for CyberDeck Remote Access
-Flask-based web interface for remote control
-"""
-
-from flask import Flask, render_template, jsonify, request
-from flask_cors import CORS
-import threading
-import logging
+"""Authenticated board telemetry. Set OPI_WEB_TOKEN and select the same YAML profile as the TUI."""
+import argparse
+import hmac
+import ipaddress
 import os
+from pathlib import Path
 
-app = Flask(__name__)
-CORS(app)
+from flask import Flask, jsonify, render_template, request
+import yaml
 
-# Global state
-cyberdeck_state = {
-    'modules': [],
-    'status': 'idle',
-    'gps_location': None,
-    'networks_found': 0,
-    'last_signal': None
-}
+from core.board_status import snapshot
+from core.config_loader import ConfigLoader
+
+DEFAULT_CONFIG = Path(__file__).resolve().parent/"config/main.yaml"
 
 
-@app.route('/')
-def index():
-    """Main dashboard"""
-    return render_template('dashboard.html')
+def create_app(config_file=None, *, token=None, collect=snapshot):
+    app = Flask(__name__)
+    path = Path(config_file or os.environ.get("OPI_CONFIG", DEFAULT_CONFIG))
+    def credentials():
+        return token if token is not None else os.environ.get("OPI_WEB_TOKEN","")
+
+    @app.before_request
+    def authorize():
+        expected = credentials()
+        if not expected:
+            return jsonify(error="Dashboard access is not configured"),503
+        auth = request.authorization
+        supplied = ""
+        if auth and auth.type == "basic" and auth.username == "viewer":
+            supplied = auth.password or ""
+        elif request.headers.get("Authorization","").startswith("Bearer "):
+            supplied = request.headers["Authorization"][7:]
+        if not hmac.compare_digest(expected.encode(),supplied.encode()):
+            return jsonify(error="Authentication required"),401,{"WWW-Authenticate":'Basic realm="Orange Pi", charset="UTF-8"'}
+
+    @app.after_request
+    def headers(response):
+        response.headers["Cache-Control"] = "no-store"
+        response.headers["X-Content-Type-Options"] = "nosniff"
+        response.headers["Content-Security-Policy"] = "default-src 'self'; object-src 'none'; frame-ancestors 'none'"
+        return response
+
+    def data():
+        with path.open() as stream:
+            config = yaml.safe_load(stream)
+        if not isinstance(config,dict):
+            raise ValueError("Invalid configuration")
+        ConfigLoader._check_structure(config)
+        return collect(config)
+
+    @app.errorhandler(OSError)
+    @app.errorhandler(ValueError)
+    @app.errorhandler(yaml.YAMLError)
+    def unavailable(exc):
+        app.logger.warning("Board status unavailable: %s",exc)
+        return jsonify(error="Board status unavailable"),503
+
+    @app.get("/")
+    def index():
+        return render_template("dashboard.html")
+
+    @app.get("/api/status")
+    def status():
+        return jsonify(data())
+
+    @app.get("/api/modules")
+    def inventory():
+        return jsonify(modules=data()["modules"])
+
+    @app.get("/api/gps/location")
+    def location():
+        fix = data()["gps_location"]
+        return jsonify(fix) if fix else (jsonify(error="No fresh GNSS fix"),503)
+
+    @app.post("/api/subghz/capture")
+    @app.get("/api/wifi/scan")
+    def unavailable_action():
+        return jsonify(error="No capture or scan provider in the web service"),501
+
+    return app
 
 
-@app.route('/api/status')
-def get_status():
-    """Get CyberDeck status"""
-    return jsonify(cyberdeck_state)
+app = create_app()
 
 
-@app.route('/api/modules')
-def get_modules():
-    """List available modules"""
-    return jsonify({
-        'modules': [
-            {'name': 'SubGHz', 'enabled': True, 'status': 'ready'},
-            {'name': 'NFC', 'enabled': True, 'status': 'ready'},
-            {'name': 'WiFi', 'enabled': True, 'status': 'idle'},
-            {'name': 'GPS', 'enabled': True, 'status': 'no_fix'},
-            {'name': 'SDR', 'enabled': True, 'status': 'idle'},
-        ]
-    })
+def run_webui(host="127.0.0.1",port=5000,config_file=None,cert=None,key=None):
+    if not os.environ.get("OPI_WEB_TOKEN"):
+        raise SystemExit("Set OPI_WEB_TOKEN for the viewer account")
+    try:
+        local = host == "localhost" or ipaddress.ip_address(host).is_loopback
+    except ValueError:
+        local = False
+    if bool(cert) != bool(key) or not local and not cert:
+        raise SystemExit("Use --tls-cert and --tls-key for a remote listener, or forward localhost over SSH")
+    create_app(config_file).run(host=host,port=port,debug=False,threaded=True,
+                                ssl_context=(cert,key) if cert else None)
 
 
-@app.route('/api/subghz/capture', methods=['POST'])
-def subghz_capture():
-    """Capture Sub-GHz signal"""
-    data = request.json
-    freq = data.get('frequency', 433.92)
-    duration = data.get('duration', 5)
-    
-    # TODO: Integrate with actual SubGHz module
-    
-    return jsonify({
-        'success': True,
-        'message': f'Capturing {freq}MHz for {duration}s',
-        'signal_id': 'sig_001'
-    })
-
-
-@app.route('/api/gps/location')
-def gps_location():
-    """Get GPS location"""
-    # TODO: Integrate with GPS module
-    return jsonify({
-        'latitude': 55.7558,
-        'longitude': 37.6173,
-        'altitude': 156,
-        'satellites': 8
-    })
-
-
-@app.route('/api/wifi/scan')
-def wifi_scan():
-    """Scan WiFi networks"""
-    # TODO: Integrate with WiFi module
-    return jsonify({
-        'networks': [
-            {'ssid': 'TestNetwork', 'bssid': '00:11:22:33:44:55', 'rssi': -45, 'channel': 6},
-            {'ssid': 'Demo_AP', 'bssid': 'AA:BB:CC:DD:EE:FF', 'rssi': -65, 'channel': 11},
-        ]
-    })
-
-
-def run_webui(host='0.0.0.0', port=5000):
-    """Run Web UI server"""
-    app.run(host=host, port=port, debug=False, threaded=True)
-
-
-if __name__ == '__main__':
-    # Create templates directory
-    os.makedirs('templates', exist_ok=True)
-    os.makedirs('static', exist_ok=True)
-    
-    print("CyberDeck Web UI Server")
-    print(f"Starting on http://0.0.0.0:5000")
-    print("Access from any browser on local network")
-    
-    run_webui()
+if __name__ == "__main__":
+    cli=argparse.ArgumentParser(description=__doc__)
+    cli.add_argument("--host",default="127.0.0.1"); cli.add_argument("--port",type=int,default=5000)
+    cli.add_argument("--config",type=Path)
+    cli.add_argument("--tls-cert"); cli.add_argument("--tls-key")
+    opts=cli.parse_args()
+    run_webui(opts.host,opts.port,opts.config,opts.tls_cert,opts.tls_key)

@@ -1,0 +1,8 @@
+:root { color-scheme:dark; font:16px/1.5 "Inter",system-ui,sans-serif; color:#dfece8; background:#15211f }
+main { max-width:54rem; margin:3rem auto; padding:0 1rem }
+h1,h2,p { margin:0 0 .65rem } h1 { font-size:clamp(1.8rem,5vw,3rem) }
+h2 { font-size:1.05rem; color:#bde2d2 } header p,#feedback { color:#a8c5b6 }
+section { padding:1rem 0; border-top:1px solid #47615a }
+.grid { display:grid; gap:0 2rem; grid-template-columns:repeat(auto-fit,minmax(min(18rem,100%),1fr)) }
+dl { margin:0; display:grid; grid-template-columns:minmax(0,1fr) minmax(0,1.6fr); gap:.35rem 1rem }
+dd { margin:0; text-align:right; overflow-wrap:anywhere; font-variant-numeric:tabular-nums }
