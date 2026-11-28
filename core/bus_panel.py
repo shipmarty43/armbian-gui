@@ -119,7 +119,7 @@ def menu(ui):
             if group == "SPI1":
                 preview += "\nПосле применения\n" + report(plan["candidate"])
             if plan["issues"]:
-                ui.show_menu("Применение заблокировано\n" + "\n".join(plan["issues"]), ["Назад"])
+                ui.show_menu("Применение заблокировано\n" + "\n".join(plan["issues"]) + "\n" + preview, ["Назад"])
                 return
             if not plan["changed"]:
                 ui.show_message("Профиль уже выбран", preview)
