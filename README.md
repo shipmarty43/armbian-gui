@@ -82,10 +82,12 @@ with the camera and I²C2 enabled. The preview moves pins 19/23 from SDA/SCL to
 MOSI/CLK and pin 24 from camera MCLK to CS0. Save once, then use **Откатить
 последнее изменение** once to restore both previous routes and the I²C clock.
 An unknown claimant or a protected bus client blocks the combined save.
-To return from SPI3 with an empty history, use **SPI → Отключить SPI3, вернуть
-камеру и включить I²C2 на 400 кГц**. One save restores the vendor camera MCLK0
-on PE0 (pin 24) and sets I²C2 to 400 kHz on PE1/PE2 (SCL/SDA, pins 23/19).
-The panel shows the frequency for the live tree and the next boot.
+The SPI3 handoff records the active I²C2 SCL selection (100 or 400 kHz) in
+the boot environment. While SPI3 owns the pins, the panel shows the saved
+frequency. Select **SPI → Отключить SPI3, вернуть камеру и восстановить частоту
+I²C2** to restore camera MCLK0 on pin 24 and I²C2 SCL/SDA on pins 23/19 at
+that rate in one save. The return works with an empty journal. Legacy SPI3
+configurations with no saved rate retain the previous 400 kHz default.
 Individual camera and pin-test actions are also available under **Резервы**.
 The debug UART remains visible on 8/10. Every route change takes effect at the
 next boot. Use **Откатить последнее изменение** to restore the saved selection.

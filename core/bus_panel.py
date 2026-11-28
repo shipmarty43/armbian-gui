@@ -68,7 +68,7 @@ def report(state):
         return "\n".join([", ".join(state["buses"]) or "Контроллеры SPI выключены",
             *(f"{r['bus']} CS{r['cs']} ({r['pin']}) · {r['device']} · режим {r['mode']} · "
               f"предел DT {r['ceiling_hz'] or '—'} Гц {r.get('endpoint') or ''}".rstrip() for r in state["rows"]),
-            *(f"I²C{k[-1]} · {v['hz']} Гц" for k,v in state.get("i2c_clocks", {}).items())])
+            *(f"I²C{k[-1]} · {'сохранено ' if v['saved'] else ''}{v['hz']} Гц" for k,v in state.get("i2c_clocks", {}).items())])
     lines = [PROFILES[state["profile"]]]
     for row in state["rows"]:
         extra = " · ".join(str(row[k]) for k in ("endpoint", "lock") if row.get(k))
