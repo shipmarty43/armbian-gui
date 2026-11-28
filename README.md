@@ -47,8 +47,13 @@ This profile loads System Tools. On the Zero 3W the panel reads the A733 live tr
 Armbian DTB. Each signal pin lists its supported routes alongside the live and
 next-boot owners, including pins that are currently free. It covers SPI2 with independently selectable CS1–CS3, SPI3 with
 two chip selects, I²C0–3, UART2/6/7 and the eight PWM channels routed to the
-header. **Резервы** previews a separate change to the camera or vendor pin-test
-reservation. Camera MCLK uses pin 24, and the vendor test device uses pin 35.
+header. Camera MCLK uses pin 24, and the vendor test device uses pin 35.
+If a single configurable owner blocks a Zero 3W route, its conflict preview
+offers a combined change. For **SPI3**, choose **Предпросмотр · Отключить камеру
+VIN и включить SPI3…**, inspect the change on pin 24 and save. One **Откатить
+последнее изменение** restores the camera and the previous SPI selection. A
+second owner or a protected bus client blocks the combined save. Individual
+camera and pin-test actions are also available under **Резервы**.
 The debug UART remains visible on 8/10. Every route change takes effect at the
 next boot. Use **Откатить последнее изменение** to restore the saved selection.
 

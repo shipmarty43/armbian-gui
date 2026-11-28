@@ -22,7 +22,7 @@ def validate(action, profile=None, token=None):
     args = [action]
     if action in ("apply", "preview"):
         if not isinstance(profile, str) or not re.fullmatch(
-                r"a733-[a-z0-9-]{1,30}|shared|single|off|(?:i2c[0-4]|uart[2-5]|pwm[1-4])-[a-z][a-z0-9-]{0,12}", profile):
+                r"a733-[a-z0-9-]{1,30}(?:\+[a-z0-9-]{1,12})?|shared|single|off|(?:i2c[0-4]|uart[2-5]|pwm[1-4])-[a-z][a-z0-9-]{0,12}", profile):
             raise PanelError("Выберите маршрут гребёнки", 400)
         args.append(profile)
     elif profile is not None:
@@ -118,7 +118,15 @@ def menu(ui):
                 return
             profile = options[index]["id"]
             plan = query("preview", profile)
-            preview = options[index]["label"] + "\n" + "\n".join(
+            offer = plan.get("alternative")
+            if offer:
+                response = ui.show_menu("Конфликт выводов\n" + "\n".join(plan["issues"]),
+                                        ["Назад", "Предпросмотр · " + offer["label"]])
+                if response != 1:
+                    return
+                profile = offer["id"]
+                plan = query("preview", profile)
+            preview = (plan.get("transition") or options[index]["label"]) + "\n" + "\n".join(
                 f"{r['pin']} {r['pad']}   {names(r['before'])} → {names(r['after'])}" for r in plan["changes"])
             if plan["warnings"]:
                 preview += "\n" + "\n".join(plan["warnings"])

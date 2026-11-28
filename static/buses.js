@@ -110,24 +110,33 @@ async function load() {
   renderChoices();
   renderPins();
 }
-async function run(action) {
+async function run(action, profile = el("profile").value) {
+  if (busy) return;
   busy = true; controls();
   el("feedback").textContent = "Проверка…";
   try {
     if (action === "preview") {
-      plan = await api(action, {profile: el("profile").value});
+      plan = await api(action, {profile});
+      plan.target = profile;
       el("issues").replaceChildren();
       if (plan.issues.length) {
         add(el("issues"), "strong", "Применение заблокировано");
         for (const issue of plan.issues) add(el("issues"), "p", issue);
       }
+      if (plan.alternative) {
+        const offer = plan.alternative;
+        const button = add(el("issues"), "button", "Предпросмотр · " + offer.label);
+        button.type = "button";
+        button.addEventListener("click", () => run("preview", offer.id));
+      }
+      if (plan.transition) add(el("issues"), "strong", plan.transition);
       for (const warning of plan.warnings) add(el("issues"), "p", warning);
       pinTable("changes", ["Было", "Запрошено"], plan.changes);
       el("candidate").replaceChildren();
       if (["SPI", "SPI1"].includes(el("profile").selectedOptions[0].parentElement.label)) render("candidate", plan.candidate);
       el("feedback").textContent = plan.changed ? "" : "Профиль уже выбран.";
     } else {
-      if (action === "apply") await api(action, {profile: el("profile").value, token: plan.token});
+      if (action === "apply") await api(action, {profile: plan.target, token: plan.token});
       if (action === "undo") await api(action, {token: state.undo});
       await load();
       el("feedback").textContent = action === "refresh" ? "" : "Сохранено для следующей загрузки.";
